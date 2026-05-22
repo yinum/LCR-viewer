@@ -154,13 +154,14 @@ def output_filename(precursor, when=None):
 
 def iter_spectrum_files(path):
     """Resolve an input path to a list of spectrum files. A file -> [file];
-    a directory -> its sorted non-hidden .txt and .csv files (non-recursive)."""
+    a directory -> its sorted non-hidden .txt, .csv and .xy files
+    (non-recursive)."""
     if os.path.isdir(path):
         out = []
         for name in sorted(os.listdir(path)):
             if name.startswith("."):
                 continue
-            if name.lower().endswith((".txt", ".csv")):
+            if name.lower().endswith((".txt", ".csv", ".xy")):
                 out.append(os.path.join(path, name))
         return out
     return [path]

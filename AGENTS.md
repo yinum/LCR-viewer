@@ -20,7 +20,7 @@ python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
 ```
 
 `INPUT` is a 2-column m/z, intensity file (whitespace- or comma-delimited) or a
-folder of them; a folder builds one viewer per `.txt`/`.csv` file. `OUTPUT_DIR`
+folder of them; a folder builds one viewer per `.txt`/`.csv`/`.xy` file. `OUTPUT_DIR`
 defaults to `../../outputs/LCR/individual peaks`. Each viewer is named
 `LCR_mz<precursor>_<timestamp>.html`. `plotly-basic.min.js` must sit next to the
 script (git-ignored — download once per `README.md`). Tests:

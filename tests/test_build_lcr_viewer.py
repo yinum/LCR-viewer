@@ -77,12 +77,12 @@ class TestIterSpectrumFiles(unittest.TestCase):
         self.assertEqual(blv.iter_spectrum_files(fh.name), [fh.name])
         os.unlink(fh.name)
 
-    def test_directory_yields_sorted_txt_and_csv(self):
+    def test_directory_yields_sorted_txt_csv_xy(self):
         d = tempfile.mkdtemp()
-        for name in ["b.txt", "a.csv", "skip.json", ".hidden.txt"]:
+        for name in ["b.txt", "a.csv", "c.xy", "skip.json", ".hidden.txt"]:
             open(os.path.join(d, name), "w").close()
         got = [os.path.basename(p) for p in blv.iter_spectrum_files(d)]
-        self.assertEqual(got, ["a.csv", "b.txt"])
+        self.assertEqual(got, ["a.csv", "b.txt", "c.xy"])
         for name in os.listdir(d):
             os.unlink(os.path.join(d, name))
         os.rmdir(d)

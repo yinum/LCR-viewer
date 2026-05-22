@@ -37,7 +37,7 @@ python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
 ```
 
 - `INPUT` — a single spectrum file, or a folder; a folder builds one viewer
-  per `.txt`/`.csv` file inside it.
+  per `.txt`/`.csv`/`.xy` file inside it.
 - `OUTPUT_DIR` — optional; defaults to `../../outputs/LCR/individual peaks`
   (the workspace `outputs/` data area).
 
