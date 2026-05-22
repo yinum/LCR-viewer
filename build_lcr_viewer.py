@@ -20,7 +20,7 @@ INPUT is whitespace/tab-delimited two columns: m/z  intensity
 The Plotly basic bundle (plotly-basic.min.js) must sit next to this script;
 download once from https://cdn.plot.ly/plotly-basic-2.35.2.min.js
 """
-import sys, os, json
+import sys, os, json, datetime
 
 def parse_spectrum(path):
     """Read a 2-column m/z, intensity file (whitespace- or comma-delimited).
@@ -88,6 +88,11 @@ def auto_threshold(mz, it):
     else:
         margin = THRESHOLD_MARGIN
     return right_mz + margin
+
+def output_filename(precursor, when=None):
+    """Per-spectrum viewer filename: LCR_mz<precursor>_<YYYYMMDD-HHMM>.html"""
+    when = when or datetime.datetime.now()
+    return "LCR_mz%d_%s.html" % (precursor, when.strftime("%Y%m%d-%H%M"))
 
 def main():
     src  = sys.argv[1] if len(sys.argv) > 1 else "clipboard_spectrum.txt"

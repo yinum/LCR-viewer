@@ -66,5 +66,12 @@ class TestBasePeakAnalysis(unittest.TestCase):
         self.assertAlmostEqual(thr, 100.78, delta=1e-4)
 
 
+class TestOutputFilename(unittest.TestCase):
+    def test_name_format(self):
+        when = datetime.datetime(2026, 5, 22, 9, 7)
+        name = blv.output_filename(2092, when)
+        self.assertEqual(name, "LCR_mz2092_20260522-0907.html")
+
+
 if __name__ == "__main__":
     unittest.main()
