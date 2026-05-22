@@ -59,6 +59,36 @@ def find_segments(mz):
     segs.append((start, n - 1))
     return segs
 
+THRESHOLD_MARGIN = 2.0  # m/z placed just past the parent envelope
+
+def _base_peak_index(it):
+    """Index of the most intense point."""
+    bi = 0
+    for i in range(1, len(it)):
+        if it[i] > it[bi]:
+            bi = i
+    return bi
+
+def precursor_mz(mz, it):
+    """Precursor ion m/z = base-peak (parent envelope apex) m/z, rounded."""
+    return int(round(mz[_base_peak_index(it)]))
+
+def auto_threshold(mz, it):
+    """Scaling threshold m/z, placed just past the right edge of the parent
+    envelope (the segment containing the base peak), clamped to stay within
+    the empty valley before the next cluster."""
+    bi = _base_peak_index(it)
+    segs = find_segments(mz)
+    parent = next(s for s in segs if s[0] <= bi <= s[1])
+    right_mz = mz[parent[1]]
+    later = [s for s in segs if s[0] > parent[1]]
+    if later:
+        gap = mz[later[0][0]] - right_mz
+        margin = min(THRESHOLD_MARGIN, gap / 2)
+    else:
+        margin = THRESHOLD_MARGIN
+    return right_mz + margin
+
 def main():
     src  = sys.argv[1] if len(sys.argv) > 1 else "clipboard_spectrum.txt"
     out  = sys.argv[2] if len(sys.argv) > 2 else "polyP_LCR_viewer.html"
