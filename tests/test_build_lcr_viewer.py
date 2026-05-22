@@ -96,7 +96,7 @@ class TestBuildHtml(unittest.TestCase):
     def test_preset_values_baked_in(self):
         html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
         self.assertIn('id="scale" value="10"', html)
-        self.assertIn('id="win" value="299"', html)
+        self.assertIn('id="width" value="0.04"', html)
         self.assertIn('id="thr" value="123.45"', html)
         self.assertIn('value="avg" selected', html)
         # overlay preset is False -> rawov checkbox must NOT be checked
@@ -117,11 +117,11 @@ class TestBuildHtml(unittest.TestCase):
         self.assertNotIn("polyP_LCR_processed.csv", html)
 
     def test_custom_preset_overrides_controls(self):
-        custom = {"scale": 7, "method": "sg", "window": 15,
+        custom = {"scale": 7, "method": "sg", "width_mz": 0.02,
                   "poly": 2, "show_overlay": True}
         html = blv.build_html(self.MZ, self.IT, 50.0, "/*plotly*/", self.NAME, custom)
         self.assertIn('id="scale" value="7"', html)
-        self.assertIn('id="win" value="15"', html)
+        self.assertIn('id="width" value="0.02"', html)
         self.assertIn('value="sg" selected', html)
         self.assertIn('id="rawov" checked', html)
 
@@ -191,12 +191,12 @@ class TestLoadPreset(unittest.TestCase):
     def test_valid_file_overrides(self):
         d = tempfile.mkdtemp()
         with open(os.path.join(d, "preset.json"), "w") as fh:
-            json.dump({"scale": 25, "method": "sg", "window": 51,
+            json.dump({"scale": 25, "method": "sg", "width_mz": 0.05,
                        "poly": 4, "show_overlay": True}, fh)
         eff = blv.load_preset(d)
         self.assertEqual(eff["scale"], 25)
         self.assertEqual(eff["method"], "sg")
-        self.assertEqual(eff["window"], 51)
+        self.assertEqual(eff["width_mz"], 0.05)
         self.assertEqual(eff["show_overlay"], True)
         os.unlink(os.path.join(d, "preset.json"))
         os.rmdir(d)
@@ -204,9 +204,9 @@ class TestLoadPreset(unittest.TestCase):
     def test_partial_keys_merge_over_defaults(self):
         d = tempfile.mkdtemp()
         with open(os.path.join(d, "preset.json"), "w") as fh:
-            json.dump({"window": 777, "bogus": 1}, fh)
+            json.dump({"width_mz": 0.08, "bogus": 1}, fh)
         eff = blv.load_preset(d)
-        self.assertEqual(eff["window"], 777)                  # overridden
+        self.assertEqual(eff["width_mz"], 0.08)               # overridden
         self.assertEqual(eff["scale"], blv.PRESET["scale"])   # default kept
         self.assertNotIn("bogus", eff)                        # unknown ignored
         os.unlink(os.path.join(d, "preset.json"))

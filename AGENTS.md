@@ -46,8 +46,11 @@ script (git-ignored — download once per `README.md`). Tests:
   (`precursor_from_name`, a trailing number in the name) when present, else the
   base-peak cluster. Fixed parameters come from `load_preset()` — the built-in
   `PRESET` dict overlaid with a viewer-saved `preset.json` (git-ignored).
-- **Smoothing** — each peak group is resampled onto a uniform m/z grid, then
-  smoothed with zero-baseline padding, so a window of N affects every peak and
-  the result equals Origin smoothing the full continuous profile.
+- **Smoothing** — each peak group is linearly interpolated onto a fine uniform
+  m/z grid (so sparse, few-point peaks gain enough points to smooth into a
+  curve) and padded with zero-baseline cells so a broadened peak decays to zero.
+  The smoothing width is set in m/z, so it covers the same span on every peak
+  and the result equals Origin smoothing the full continuous profile. Grid
+  constants (`GRID_DX`, `MAX_CELLS`, `PAD_MZ`) are in the in-HTML `buildGrid`.
 
 See code comments in `build_lcr_viewer.py` for detail.

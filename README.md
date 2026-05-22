@@ -10,12 +10,12 @@ The viewer lets you:
    leaving the parent envelope at 1x.
 2. **Smooth** the spectrum with an Origin-style method dropdown
    (Savitzky-Golay, adjacent averaging, Gaussian, binomial, median/percentile).
-   Each peak group is resampled onto a uniform m/z grid (collapsed baseline
-   restored as zeros) and smoothed with zero-baseline padding: past a peak
-   group's edge the window is filled with zeros rather than shrunk, so a window
-   of N affects every peak identically and the result equals Origin smoothing
-   the full continuous zero-baseline profile. The spectrum is drawn as one
-   continuous line.
+   Each peak group is linearly interpolated onto a fine uniform m/z grid (so
+   even sparse, few-point peaks gain enough points to form a smooth curve) and
+   padded with zero-baseline cells on each side so a broadened peak decays back
+   to zero. The smoothing width is set in **m/z**, so it covers the same span on
+   every peak, and the result equals Origin smoothing the full continuous
+   zero-baseline profile. The spectrum is drawn as one continuous line.
 
 All controls update the plot live; PNG export and processed-CSV export are built in.
 
@@ -51,7 +51,7 @@ intense than the precursor. The timestamp means re-runs never overwrite a
 prior viewer.
 
 Processing parameters come from the preset (built-in `PRESET` defaults —
-charge-reduced ×10, adjacent-averaging smoothing, window 299, pre-smoothing
+charge-reduced ×10, adjacent-averaging smoothing, width 0.04 m/z, pre-smoothing
 overlay hidden — overlaid by a viewer-saved `preset.json` if present; see
 [Saving a preset](#saving-a-preset)). The "scale applies above m/z" threshold
 is auto-placed per spectrum, just past the parent envelope. All values stay

@@ -7,13 +7,14 @@ Build a self-contained interactive HTML viewer for a polyP limited-charge-reduct
 Pipeline exposed in the HTML (live, editable):
   1. Scale the charge-reduced region (m/z >= threshold) by a factor (PRESET, 10x);
      parent envelope stays 1x.
-  2. Smooth the spectrum. Each peak group is resampled onto a uniform m/z grid
-     (collapsed baseline restored as zeros) and smoothed with zero-baseline
-     padding: past a peak group's edge the window is filled with zeros rather
-     than shrunk, so a window of N affects every peak identically and the
-     result equals Origin smoothing the full continuous zero-baseline profile.
-     The spectrum is drawn as one continuous line. Methods: Savitzky-Golay,
-     adjacent averaging, Gaussian, binomial, median/percentile.
+  2. Smooth the spectrum. Each peak group is linearly interpolated onto a fine
+     uniform m/z grid (GRID_DX resolution), so sparse peaks gain enough points
+     to form a smooth curve. The smoothing width is given in m/z and converted
+     to a point window per segment, with zero-baseline padding past each peak
+     group's edge -- the width covers the same m/z span on every peak, matching
+     Origin's continuous-profile smoothing. The spectrum is drawn as one
+     continuous line. Methods: Savitzky-Golay, adjacent averaging, Gaussian,
+     binomial, median/percentile.
 
 Usage:  python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
 INPUT is a 2-column m/z, intensity file (whitespace- or comma-delimited),
@@ -33,7 +34,7 @@ import sys, os, json, re, datetime
 PRESET = {
     "scale": 10,            # charge-reduced x factor
     "method": "avg",        # smoothing method (adjacent averaging)
-    "window": 299,          # smoothing window (odd)
+    "width_mz": 0.04,       # smoothing width in m/z
     "poly": 3,              # SG poly order, retained for the SG control
     "show_overlay": False,  # pre-smoothing overlay checkbox default
 }
@@ -176,7 +177,7 @@ def build_html(mz, it, thr, plotly, html_name, preset):
     html = TEMPLATE
     html = html.replace("__SCALE__", str(preset["scale"]))
     html = html.replace("__THR__", "%g" % thr)
-    html = html.replace("__WIN__", str(preset["window"]))
+    html = html.replace("__WIDTH__", str(preset["width_mz"]))
     html = html.replace("__POLY__", str(preset["poly"]))
     html = html.replace("__RAWOV__", "checked" if preset["show_overlay"] else "")
     html = html.replace('value="%s"' % preset["method"],
@@ -262,8 +263,8 @@ TEMPLATE = r"""<!DOCTYPE html>
      <option value="binom">Binomial</option>
      <option value="median">Median / percentile</option>
    </select></div>
- <div class="ctl"><label>Window (odd pts)</label>
-   <input type="number" id="win" value="__WIN__" step="2" min="3"></div>
+ <div class="ctl"><label>Smoothing width (m/z)</label>
+   <input type="number" id="width" value="__WIDTH__" step="0.005" min="0" max="0.2"></div>
  <div class="ctl"><label>Poly order (SG)</label>
    <input type="number" id="poly" value="__POLY__" step="1" min="1" max="6"></div>
  <div class="ctl chk">
@@ -277,9 +278,10 @@ TEMPLATE = r"""<!DOCTYPE html>
 </div>
 <div class="hint">
  Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope stays x1;
- (2) smoothing on a uniform m/z grid with zero-baseline padding - a window of N affects
- every peak (large or small), drawn as one continuous spectrum. Matches Origin's
- continuous-profile smoothing. Edit any control - plot updates live. <span id="status"></span>
+ (2) sparse peaks are linearly interpolated onto a fine uniform m/z grid, then smoothed
+ with zero-baseline padding - the smoothing width is in m/z, so it covers the same span
+ on every peak, drawn as one continuous spectrum. Matches Origin's continuous-profile
+ smoothing. Edit any control - plot updates live. <span id="status"></span>
 </div>
 <div id="plot"></div>
 <script>__PLOTLY__</script>
@@ -289,6 +291,13 @@ const RAW_IT=__IT__;
 const CSV_NAME=__CSVNAME__;
 
 // ---------- build uniform per-segment grid (once) ----------
+// GRID_DX is the target grid resolution (m/z). Each peak group is linearly
+// interpolated onto a uniform grid this fine, so sparse peaks (only a few raw
+// points) gain enough points to smooth into a curve. The grid is never coarser
+// than the raw data; MAX_CELLS bounds a very wide segment. PAD_MZ is the width
+// of zero-baseline cells added on each side of a peak group so a broadened
+// (smoothed) peak can decay back to zero within its own segment.
+const GRID_DX=0.002, MAX_CELLS=6000, PAD_MZ=0.12;
 function median(arr){const a=arr.slice().sort((x,z)=>x-z);
  return a.length?a[(a.length-1)>>1]:0;}
 function buildGrid(){
@@ -301,26 +310,41 @@ function buildGrid(){
  for(let i=1;i<n;i++){
   if(RAW_MZ[i]-RAW_MZ[i-1]>gapThr){segs.push([start,i-1]);start=i;}}
  segs.push([start,n-1]);
- // resample each segment onto its own uniform grid
+ // resample each segment onto a fine uniform grid by linear interpolation.
+ // bounds entries are [gridStart, gridEnd, step] -- step lets the smoother
+ // turn an m/z width into a point window.
  const gmz=[], git=[], bounds=[];
  for(const seg of segs){
   const s=seg[0], e=seg[1], m0=RAW_MZ[s], m1=RAW_MZ[e];
   const gStart=gmz.length;
   if(e>s && m1>m0){
-   const segGaps=[];
-   for(let i=s+1;i<=e;i++){const g=RAW_MZ[i]-RAW_MZ[i-1];if(g>0)segGaps.push(g);}
-   const dxs=Math.max(median(segGaps),(m1-m0)/4000); // cap grid size
-   const ncell=Math.max(2,Math.round((m1-m0)/dxs)+1);
+   // grid step: as fine as GRID_DX, never coarser than the raw data,
+   // capped by MAX_CELLS so a very wide segment stays bounded.
+   const dxTarget=Math.min(GRID_DX,dx0);
+   let ncell=Math.round((m1-m0)/dxTarget)+1;
+   if(ncell<2)ncell=2; if(ncell>MAX_CELLS)ncell=MAX_CELLS;
    const step=(m1-m0)/(ncell-1);
-   const cells=new Array(ncell).fill(0);
-   for(let k=s;k<=e;k++){
-    let idx=Math.round((RAW_MZ[k]-m0)/step);
-    if(idx<0)idx=0; if(idx>=ncell)idx=ncell-1;
-    if(RAW_IT[k]>cells[idx])cells[idx]=RAW_IT[k];}
-   for(let c=0;c<ncell;c++){gmz.push(m0+c*step);git.push(cells[c]);}
+   // leading zero-baseline pad so the smoothed peak decays to zero on the left
+   const npad=Math.round(PAD_MZ/step);
+   for(let c=npad;c>=1;c--){gmz.push(m0-c*step);git.push(0);}
+   // linear-interpolate raw intensity onto the uniform cells (two-pointer
+   // sweep -- raw m/z and grid cells are both ascending).
+   let j=s;
+   for(let c=0;c<ncell;c++){
+    const x=m0+c*step;
+    while(j<e && RAW_MZ[j+1]<x)j++;
+    const x0=RAW_MZ[j], x1=RAW_MZ[j+1];
+    let y;
+    if(x1===x0){y=Math.max(RAW_IT[j],RAW_IT[j+1]);}
+    else{let t=(x-x0)/(x1-x0); if(t<0)t=0; if(t>1)t=1;
+     y=RAW_IT[j]+t*(RAW_IT[j+1]-RAW_IT[j]);}
+    gmz.push(x); git.push(y);}
+   // trailing zero-baseline pad (decay to zero on the right)
+   for(let c=1;c<=npad;c++){gmz.push(m1+c*step);git.push(0);}
+   bounds.push([gStart,gmz.length-1,step]);
   }else{
-   for(let k=s;k<=e;k++){gmz.push(RAW_MZ[k]);git.push(RAW_IT[k]);}}
-  bounds.push([gStart,gmz.length-1]);
+   for(let k=s;k<=e;k++){gmz.push(RAW_MZ[k]);git.push(RAW_IT[k]);}
+   bounds.push([gStart,gmz.length-1,0]);}
  }
  return {gmz,git,bounds,nseg:segs.length};
 }
@@ -329,9 +353,8 @@ const G=buildGrid();
 // ---------- smoothing primitives (zero-padded) ----------
 // The baseline outside a peak group is physically zero, so the smoothing
 // window is filled with zeros past a segment edge instead of being shrunk.
-// Consequence: a window of N affects every peak (large or small) identically,
-// and the result equals Origin smoothing the full continuous zero-baseline
-// profile.
+// Consequence: the smoothing covers the same m/z span on every peak, and the
+// result equals Origin smoothing the full continuous zero-baseline profile.
 function clampWin(w){w=Math.round(w);if(w%2===0)w++;if(w<3)w=3;if(w>999)w=999;return w;}
 function vAt(y,i){return (i>=0&&i<y.length)?y[i]:0;}
 function movingAvg(y,w){const n=y.length,h=(w-1)/2,o=new Array(n);
@@ -380,11 +403,15 @@ function savgol(y,w,p){const n=y.length;
  return o;}
 
 // ---------- apply chosen method per segment ----------
-function smoothAll(y,method,w,p){
+// widthMz (m/z) becomes a point window per segment via that segment's grid
+// step, so the smoothing covers the same m/z span on every peak.
+function smoothAll(y,method,widthMz,p){
  if(method==='none')return y.slice();
- const ww=clampWin(w),o=y.slice();
+ const o=y.slice();
  for(const bd of G.bounds){
-  const b0=bd[0],b1=bd[1],seg=y.slice(b0,b1+1);
+  const b0=bd[0],b1=bd[1],step=bd[2],seg=y.slice(b0,b1+1);
+  if(seg.length<3)continue;            // too short to smooth -- leave as-is
+  const ww=clampWin(step>0?widthMz/step:3);
   let sm;
   if(method==='avg')sm=movingAvg(seg,ww);
   else if(method==='gauss')sm=convolve(seg,gaussKernel(ww));
@@ -401,12 +428,12 @@ function recompute(){
  const factor=parseFloat(document.getElementById('scale').value)||1;
  const thr=parseFloat(document.getElementById('thr').value)||0;
  const method=document.getElementById('method').value;
- const w=parseInt(document.getElementById('win').value)||11;
+ const widthMz=parseFloat(document.getElementById('width').value)||0.04;
  const p=parseInt(document.getElementById('poly').value)||3;
  const logy=document.getElementById('logy').checked;
  const rawov=document.getElementById('rawov').checked;
  const scaled=G.git.map((v,i)=>G.gmz[i]>=thr?v*factor:v);
- const sm=smoothAll(scaled,method,w,p);
+ const sm=smoothAll(scaled,method,widthMz,p);
  // one continuous line: segment ends sit at the zero baseline, so the
  // connectors simply run along the baseline between peak groups.
  const px=G.gmz, py=sm, pov=scaled;
@@ -433,7 +460,7 @@ function recompute(){
    G.nseg+' peak segments, '+G.gmz.length+' grid points.';
  syncCSV();
 }
-['scale','thr','method','win','poly','logy','rawov'].forEach(id=>{
+['scale','thr','method','width','poly','logy','rawov'].forEach(id=>{
  const el=document.getElementById(id);
  el.addEventListener('input',recompute);
  el.addEventListener('change',recompute);
@@ -483,7 +510,7 @@ function buildPreset(){
  return {
   scale:parseFloat(document.getElementById('scale').value)||1,
   method:document.getElementById('method').value,
-  window:parseInt(document.getElementById('win').value)||3,
+  width_mz:parseFloat(document.getElementById('width').value)||0.04,
   poly:parseInt(document.getElementById('poly').value)||3,
   show_overlay:document.getElementById('rawov').checked
  };
