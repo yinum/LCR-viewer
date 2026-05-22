@@ -45,11 +45,12 @@ Each viewer is named `LCR_mz<precursor>_<YYYYMMDD-HHMM>.html`, where
 `<precursor>` is the parent-envelope (base-peak) m/z. The timestamp means
 re-runs never overwrite a prior viewer.
 
-Processing parameters are fixed by the `PRESET` dict at the top of the script
-(charge-reduced ×10, adjacent-averaging smoothing, window 299, pre-smoothing
-overlay hidden). The "scale applies above m/z" threshold is auto-placed per
-spectrum, just past the parent envelope. All values stay live-editable in the
-viewer; the preset only sets the starting point.
+Processing parameters come from the preset (built-in `PRESET` defaults —
+charge-reduced ×10, adjacent-averaging smoothing, window 299, pre-smoothing
+overlay hidden — overlaid by a viewer-saved `preset.json` if present; see
+[Saving a preset](#saving-a-preset)). The "scale applies above m/z" threshold
+is auto-placed per spectrum, just past the parent envelope. All values stay
+live-editable in the viewer; the preset only sets the starting point.
 
 The generated HTML is fully self-contained (Plotly inlined) and works offline —
 no data leaves the machine.
