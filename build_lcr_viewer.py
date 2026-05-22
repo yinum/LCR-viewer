@@ -7,13 +7,13 @@ Build a self-contained interactive HTML viewer for a polyP limited-charge-reduct
 Pipeline exposed in the HTML (live, editable):
   1. Scale the charge-reduced region (m/z >= threshold) by a factor (default 50x);
      parent envelope stays 1x.
-  2. Smooth the spectrum. Smoothing runs on a uniform per-segment m/z grid: the
-     spectrum is split at gaps, each peak group is resampled onto a uniform grid
-     (collapsed baseline restored as zeros), and the chosen method is applied
-     within each segment only -- peaks are never smoothed across a gap. This
-     reproduces what Origin operates on (a continuous uniform profile).
-     Methods: Savitzky-Golay (proper polynomial edge handling), adjacent
-     averaging, Gaussian, binomial, median/percentile.
+  2. Smooth the spectrum. Each peak group is resampled onto a uniform m/z grid
+     (collapsed baseline restored as zeros) and smoothed with zero-baseline
+     padding: past a peak group's edge the window is filled with zeros rather
+     than shrunk, so a window of N affects every peak identically and the
+     result equals Origin smoothing the full continuous zero-baseline profile.
+     The spectrum is drawn as one continuous line. Methods: Savitzky-Golay,
+     adjacent averaging, Gaussian, binomial, median/percentile.
 
 Usage:  python3 build_lcr_viewer.py INPUT.txt OUTPUT.html
 INPUT is whitespace/tab-delimited two columns: m/z  intensity
@@ -100,9 +100,9 @@ TEMPLATE = r"""<!DOCTYPE html>
 </div>
 <div class="hint">
  Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope ~m/z 2092 stays x1;
- (2) smoothing on a uniform per-segment m/z grid (collapsed baseline restored, peaks never
- smoothed across a gap) - matches Origin's continuous-profile smoothing.
- Edit any control - plot updates live. <span id="status"></span>
+ (2) smoothing on a uniform m/z grid with zero-baseline padding - a window of N affects
+ every peak (large or small), drawn as one continuous spectrum. Matches Origin's
+ continuous-profile smoothing. Edit any control - plot updates live. <span id="status"></span>
 </div>
 <div id="plot"></div>
 <script>__PLOTLY__</script>
@@ -148,22 +148,27 @@ function buildGrid(){
 }
 const G=buildGrid();
 
-// ---------- smoothing primitives ----------
-function clampWin(w,n){w=Math.round(w);if(w%2===0)w++;if(w<3)w=3;
- if(w>n){w=(n%2)?n:n-1;}if(w<1)w=1;return w;}
+// ---------- smoothing primitives (zero-padded) ----------
+// The baseline outside a peak group is physically zero, so the smoothing
+// window is filled with zeros past a segment edge instead of being shrunk.
+// Consequence: a window of N affects every peak (large or small) identically,
+// and the result equals Origin smoothing the full continuous zero-baseline
+// profile.
+function clampWin(w){w=Math.round(w);if(w%2===0)w++;if(w<3)w=3;if(w>999)w=999;return w;}
+function vAt(y,i){return (i>=0&&i<y.length)?y[i]:0;}
 function movingAvg(y,w){const n=y.length,h=(w-1)/2,o=new Array(n);
- for(let i=0;i<n;i++){let a=Math.max(0,i-h),b=Math.min(n-1,i+h),s=0;
-  for(let j=a;j<=b;j++)s+=y[j];o[i]=s/(b-a+1);}return o;}
+ for(let i=0;i<n;i++){let s=0;for(let j=-h;j<=h;j++)s+=vAt(y,i+j);o[i]=s/w;}
+ return o;}
 function gaussKernel(w){const h=(w-1)/2,sig=w/6.0,k=[];let s=0;
  for(let j=-h;j<=h;j++){const v=Math.exp(-(j*j)/(2*sig*sig));k.push(v);s+=v;}
  return k.map(v=>v/s);}
-function convolve(y,kernel){const n=y.length,w=kernel.length,h=(w-1)/2,o=new Array(n);
- for(let i=0;i<n;i++){let sum=0,ws=0;
-  for(let j=-h;j<=h;j++){const idx=i+j;if(idx<0||idx>=n)continue;
-   sum+=y[idx]*kernel[j+h];ws+=kernel[j+h];}o[i]=sum/ws;}return o;}
+function convolve(y,kernel){const w=kernel.length,h=(w-1)/2,n=y.length,o=new Array(n);
+ for(let i=0;i<n;i++){let s=0;
+  for(let j=-h;j<=h;j++)s+=vAt(y,i+j)*kernel[j+h];o[i]=s;}return o;}
 function medianFilt(y,w){const n=y.length,h=(w-1)/2,o=new Array(n);
- for(let i=0;i<n;i++){let a=Math.max(0,i-h),b=Math.min(n-1,i+h),
-  win=y.slice(a,b+1).sort((x,z)=>x-z);o[i]=win[(win.length-1)>>1];}return o;}
+ for(let i=0;i<n;i++){const win=[];
+  for(let j=-h;j<=h;j++)win.push(vAt(y,i+j));
+  win.sort((a,b)=>a-b);o[i]=win[(win.length-1)>>1];}return o;}
 function binomial(y,w){let iters=(w-1)/2,o=y.slice();const k=[0.25,0.5,0.25];
  for(let t=0;t<iters;t++)o=convolve(o,k);return o;}
 function invert(M){const n=M.length,
@@ -190,26 +195,18 @@ function savgolM(w,p){const h=(w-1)/2,A=[];
   M.push(row);}
  return M;}
 function savgol(y,w,p){const n=y.length;
- if(w>n)w=(n%2)?n:n-1; if(w<3)return y.slice(); if(p>=w)p=w-1;
- const h=(w-1)/2,M=savgolM(w,p),o=new Array(n);
- for(let i=0;i<n;i++){
-  let base,t;
-  if(i<h){base=0;t=i-h;}
-  else if(i>=n-h){base=n-w;t=i-(n-1-h);}
-  else{base=i-h;t=0;}
-  let s=0;
-  for(let j=0;j<w;j++){let c=0;
-   for(let k=0;k<=p;k++)c+=Math.pow(t,k)*M[k][j];
-   s+=c*y[base+j];}
-  o[i]=s;}
+ if(w<3)return y.slice(); if(p>=w)p=w-1;
+ const h=(w-1)/2,c=savgolM(w,p)[0],o=new Array(n);
+ for(let i=0;i<n;i++){let s=0;
+  for(let j=-h;j<=h;j++)s+=c[j+h]*vAt(y,i+j);o[i]=s;}
  return o;}
 
 // ---------- apply chosen method per segment ----------
 function smoothAll(y,method,w,p){
  if(method==='none')return y.slice();
- const o=y.slice();
+ const ww=clampWin(w),o=y.slice();
  for(const bd of G.bounds){
-  const b0=bd[0],b1=bd[1],seg=y.slice(b0,b1+1),ww=clampWin(w,seg.length);
+  const b0=bd[0],b1=bd[1],seg=y.slice(b0,b1+1);
   let sm;
   if(method==='avg')sm=movingAvg(seg,ww);
   else if(method==='gauss')sm=convolve(seg,gaussKernel(ww));
@@ -232,13 +229,10 @@ function recompute(){
  const rawov=document.getElementById('rawov').checked;
  const scaled=G.git.map((v,i)=>G.gmz[i]>=thr?v*factor:v);
  const sm=smoothAll(scaled,method,w,p);
- // build plot arrays with null breaks between segments (no lines across gaps)
- const px=[],py=[],pov=[]; PROC_X=[];PROC_Y=[];
- for(const bd of G.bounds){
-  for(let i=bd[0];i<=bd[1];i++){
-   px.push(G.gmz[i]);py.push(sm[i]);pov.push(scaled[i]);
-   PROC_X.push(G.gmz[i]);PROC_Y.push(sm[i]);}
-  px.push(null);py.push(null);pov.push(null);}
+ // one continuous line: segment ends sit at the zero baseline, so the
+ // connectors simply run along the baseline between peak groups.
+ const px=G.gmz, py=sm, pov=scaled;
+ PROC_X=G.gmz; PROC_Y=sm;
  const traces=[];
  if(rawov)traces.push({x:px,y:pov,name:'scaled, pre-smooth',mode:'lines',
    line:{width:0.8,color:'rgba(150,150,150,0.55)'}});

@@ -9,11 +9,12 @@ The viewer lets you:
    leaving the parent envelope at 1x.
 2. **Smooth** the spectrum with an Origin-style method dropdown
    (Savitzky-Golay, adjacent averaging, Gaussian, binomial, median/percentile).
-   Smoothing runs on a uniform per-segment m/z grid: the spectrum is split at
-   gaps, each peak group is resampled onto a uniform grid (collapsed baseline
-   restored as zeros), and the method is applied within each segment only — peaks
-   are never smoothed across a gap. This reproduces what Origin operates on (a
-   continuous uniform profile).
+   Each peak group is resampled onto a uniform m/z grid (collapsed baseline
+   restored as zeros) and smoothed with zero-baseline padding: past a peak
+   group's edge the window is filled with zeros rather than shrunk, so a window
+   of N affects every peak identically and the result equals Origin smoothing
+   the full continuous zero-baseline profile. The spectrum is drawn as one
+   continuous line.
 
 All controls update the plot live; PNG export and processed-CSV export are built in.
 
