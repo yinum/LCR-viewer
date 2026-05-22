@@ -1,0 +1,10 @@
+# This folder holds years of private scientific data and personal information.
+# This repository tracks ONLY the code. Strategy: ignore everything, then
+# whitelist the specific files that are safe to commit. This guarantees that
+# even `git add .` / `git add -A` cannot sweep in private data.
+
+/*
+
+!.gitignore
+!README.md
+!build_lcr_viewer.py
