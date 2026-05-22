@@ -116,15 +116,32 @@ def precursor_mz(mz, it):
     """Precursor ion m/z = base-peak (parent envelope apex) m/z, rounded."""
     return int(round(mz[_base_peak_index(it)]))
 
-def auto_threshold(mz, it):
+def _segment_nearest(mz, segs, target):
+    """The (start, end) segment whose m/z range contains target; if none
+    contains it, the segment whose nearest edge is closest to target."""
+    for s in segs:
+        if mz[s[0]] <= target <= mz[s[1]]:
+            return s
+    def edge_dist(s):
+        if target < mz[s[0]]:
+            return mz[s[0]] - target
+        return target - mz[s[1]]
+    return min(segs, key=edge_dist)
+
+
+def auto_threshold(mz, it, precursor=None):
     """Scaling threshold m/z, placed a fixed margin (THRESHOLD_MARGIN) past the
-    right edge of the parent envelope -- the segment containing the base peak.
-    The charge-reduced ladder sits well above the precursor, so a fixed offset
-    is safer than clamping to the nearest peak, which is typically a minor
-    satellite just above the envelope rather than a charge-reduced product."""
-    bi = _base_peak_index(it)
+    right edge of the parent envelope. The parent envelope is the cluster
+    containing/nearest the precursor m/z when one is given (e.g. parsed from
+    the filename); otherwise the cluster containing the base peak. The
+    charge-reduced ladder sits well above the precursor, so a fixed offset is
+    used rather than clamping to the nearest peak."""
     segs = find_segments(mz)
-    parent = next(s for s in segs if s[0] <= bi <= s[1])
+    if precursor is None:
+        bi = _base_peak_index(it)
+        parent = next(s for s in segs if s[0] <= bi <= s[1])
+    else:
+        parent = _segment_nearest(mz, segs, precursor)
     return mz[parent[1]] + THRESHOLD_MARGIN
 
 def output_filename(precursor, when=None):

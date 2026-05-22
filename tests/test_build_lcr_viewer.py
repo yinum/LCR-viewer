@@ -205,5 +205,25 @@ class TestPrecursorFromName(unittest.TestCase):
         self.assertIsNone(blv.precursor_from_name("clipboard_spectrum.txt"))
 
 
+class TestPrecursorThreshold(unittest.TestCase):
+    # cluster A near m/z 100 (minor); cluster B near m/z 200 (holds the base peak)
+    MZ = [100.0, 100.1, 100.2, 200.0, 200.1, 200.2]
+    IT = [20.0, 30.0, 20.0, 40.0, 90.0, 40.0]
+
+    def test_no_precursor_uses_base_peak_cluster(self):
+        thr = blv.auto_threshold(self.MZ, self.IT)
+        self.assertAlmostEqual(thr, 200.2 + blv.THRESHOLD_MARGIN, delta=1e-6)
+
+    def test_precursor_anchors_to_its_own_cluster(self):
+        # base peak is in cluster B (~200), but precursor 100 -> cluster A
+        thr = blv.auto_threshold(self.MZ, self.IT, 100.0)
+        self.assertAlmostEqual(thr, 100.2 + blv.THRESHOLD_MARGIN, delta=1e-6)
+
+    def test_precursor_in_gap_uses_nearest_cluster(self):
+        # precursor 130 lies between the clusters; nearest edge is A's (100.2)
+        thr = blv.auto_threshold(self.MZ, self.IT, 130.0)
+        self.assertAlmostEqual(thr, 100.2 + blv.THRESHOLD_MARGIN, delta=1e-6)
+
+
 if __name__ == "__main__":
     unittest.main()
