@@ -1,4 +1,4 @@
-# polyp-lcr-viewer — agent guide
+# LCR-viewer — agent guide
 
 Interactive HTML viewer for polyP limited-charge-reduction (LCR) mass spectra.
 `build_lcr_viewer.py` reads a 2-column m/z–intensity spectrum and emits a
@@ -6,7 +6,7 @@ self-contained interactive HTML viewer. User-facing detail is in `README.md`.
 
 ## Project layout & boundaries
 
-This repo lives at `PolyP/code/polyp-lcr-viewer/`. The parent `PolyP/` folder and
+This repo lives at `PolyP/code/LCR-viewer/`. The parent `PolyP/` folder and
 its sibling directories (`data/`, `results/`, `outputs/`, `meetings/`, …) hold
 years of **private scientific data and personal information** — do not read,
 move, or commit anything outside this repo folder. All code projects live under
