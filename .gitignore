@@ -12,3 +12,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# local tuned preset written by the viewer's Save preset button
+preset.json

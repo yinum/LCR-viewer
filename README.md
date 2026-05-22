@@ -61,6 +61,17 @@ once and it is rewritten automatically on every parameter change. Other
 browsers fall back to the **Download processed CSV** button, which regenerates
 the CSV from current parameters on each click.
 
+### Saving a preset
+
+Tune the controls in any viewer, then click **Save preset** to write a
+`preset.json`. Keep that file next to `build_lcr_viewer.py`: every later run
+loads it and uses its values as the control defaults. The built-in `PRESET`
+dict in the script is the fallback when no `preset.json` is present.
+
+In Chrome or Edge, Save preset writes the file directly; other browsers
+download `preset.json`, which you then move next to the script. `preset.json`
+is git-ignored — it is local tuning state.
+
 ## Tests
 
 ```sh
