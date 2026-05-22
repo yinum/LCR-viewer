@@ -264,7 +264,7 @@ TEMPLATE = r"""<!DOCTYPE html>
      <option value="median">Median / percentile</option>
    </select></div>
  <div class="ctl"><label>Smoothing width (m/z)</label>
-   <input type="number" id="width" value="__WIDTH__" step="0.005" min="0" max="0.2"></div>
+   <input type="number" id="width" value="__WIDTH__" step="0.005" min="0" max="10"></div>
  <div class="ctl"><label>Poly order (SG)</label>
    <input type="number" id="poly" value="__POLY__" step="1" min="1" max="6"></div>
  <div class="ctl chk">
@@ -296,8 +296,15 @@ const CSV_NAME=__CSVNAME__;
 // points) gain enough points to smooth into a curve. The grid is never coarser
 // than the raw data; MAX_CELLS bounds a very wide segment. PAD_MZ is the width
 // of zero-baseline cells added on each side of a peak group so a broadened
-// (smoothed) peak can decay back to zero within its own segment.
-const GRID_DX=0.002, MAX_CELLS=6000, PAD_MZ=0.12;
+// (smoothed) peak decays back to zero within its own segment; 0.5 is the
+// largest value that cannot make padded neighbours overlap (segments split
+// only at gaps > 1.0 m/z), and it keeps the baseline clean for smoothing
+// widths up to ~1 m/z (beyond that a peak's skirt outruns its pad).
+// GROUP_GAP is the empty-m/z stretch across which the drawn line is held flat
+// on the zero baseline (via inserted anchor points), so distant peak groups
+// are joined only by a true baseline -- not a connector at an elevated,
+// average-looking level. Smoothing is unaffected; it is always per cluster.
+const GRID_DX=0.002, MAX_CELLS=6000, PAD_MZ=0.5, GROUP_GAP=30;
 function median(arr){const a=arr.slice().sort((x,z)=>x-z);
  return a.length?a[(a.length-1)>>1]:0;}
 function buildGrid(){
@@ -355,10 +362,15 @@ const G=buildGrid();
 // window is filled with zeros past a segment edge instead of being shrunk.
 // Consequence: the smoothing covers the same m/z span on every peak, and the
 // result equals Origin smoothing the full continuous zero-baseline profile.
-function clampWin(w){w=Math.round(w);if(w%2===0)w++;if(w<3)w=3;if(w>999)w=999;return w;}
+function clampWin(w){w=Math.round(w);if(w%2===0)w++;if(w<3)w=3;if(w>8001)w=8001;return w;}
 function vAt(y,i){return (i>=0&&i<y.length)?y[i]:0;}
+// running-sum moving average -- O(n) regardless of window, so a wide
+// smoothing width stays responsive.
 function movingAvg(y,w){const n=y.length,h=(w-1)/2,o=new Array(n);
- for(let i=0;i<n;i++){let s=0;for(let j=-h;j<=h;j++)s+=vAt(y,i+j);o[i]=s/w;}
+ if(n===0)return o;
+ let s=0; for(let j=-h;j<=h;j++)s+=vAt(y,j);
+ o[0]=s/w;
+ for(let i=1;i<n;i++){s+=vAt(y,i+h)-vAt(y,i-h-1);o[i]=s/w;}
  return o;}
 function gaussKernel(w){const h=(w-1)/2,sig=w/6.0,k=[];let s=0;
  for(let j=-h;j<=h;j++){const v=Math.exp(-(j*j)/(2*sig*sig));k.push(v);s+=v;}
@@ -434,10 +446,21 @@ function recompute(){
  const rawov=document.getElementById('rawov').checked;
  const scaled=G.git.map((v,i)=>G.gmz[i]>=thr?v*factor:v);
  const sm=smoothAll(scaled,method,widthMz,p);
- // one continuous line: segment ends sit at the zero baseline, so the
- // connectors simply run along the baseline between peak groups.
- const px=G.gmz, py=sm, pov=scaled;
  PROC_X=G.gmz; PROC_Y=sm;
+ // Draw as one continuous line. Across an empty stretch wider than GROUP_GAP,
+ // insert two zero-baseline anchor points so the line runs flat along the zero
+ // baseline between distant peak groups -- a true baseline, not a connector
+ // that bridges them at an elevated, average-looking level.
+ const px=[],py=[],pov=[];
+ for(let b=0;b<G.bounds.length;b++){
+  const b0=G.bounds[b][0], b1=G.bounds[b][1];
+  if(b>0){
+   const prevEnd=G.gmz[G.bounds[b-1][1]], thisStart=G.gmz[b0];
+   if(thisStart-prevEnd>GROUP_GAP){
+    px.push(prevEnd+1.0,thisStart-1.0); py.push(0,0); pov.push(0,0);}
+  }
+  for(let i=b0;i<=b1;i++){px.push(G.gmz[i]);py.push(sm[i]);pov.push(scaled[i]);}
+ }
  const traces=[];
  if(rawov)traces.push({x:px,y:pov,name:'scaled, pre-smooth',mode:'lines',
    line:{width:0.8,color:'rgba(150,150,150,0.55)'}});
@@ -466,8 +489,10 @@ function recompute(){
  el.addEventListener('change',recompute);
 });
 function buildCSV(){
+ // drop zero-intensity points (the zero-baseline grid and pad cells)
  let csv='m/z,intensity_processed\n';
- for(let i=0;i<PROC_X.length;i++)csv+=PROC_X[i]+','+PROC_Y[i]+'\n';
+ for(let i=0;i<PROC_X.length;i++)
+  if(PROC_Y[i]>0)csv+=PROC_X[i]+','+PROC_Y[i]+'\n';
  return csv;
 }
 document.getElementById('dl').addEventListener('click',()=>{
