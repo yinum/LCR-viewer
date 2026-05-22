@@ -18,6 +18,8 @@ The viewer lets you:
    zero-baseline profile. The spectrum is drawn as one continuous line.
 
 All controls update the plot live; PNG export and processed-CSV export are built in.
+Each build also writes a processed CSV next to the viewer (see
+[Sibling CSV file](#sibling-csv-file)).
 
 ## Setup
 
@@ -34,15 +36,23 @@ Input is a 2-column m/z, intensity file (whitespace-, tab-, or comma-delimited),
 or a folder of such files.
 
 ```sh
-python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
+python3 build_lcr_viewer.py [--serve] INPUT [OUTPUT_DIR]
 ```
 
 - `INPUT` — a single spectrum file, or a folder; a folder builds one viewer
   per `.txt`/`.csv`/`.xy` file inside it.
-- `OUTPUT_DIR` — optional; defaults to `../../outputs/LCR/individual peaks`
-  (the workspace `outputs/` data area).
+- `OUTPUT_DIR` — optional; defaults to `output/LCR/<dataset>/` beside the
+  script, where `<dataset>` is the input folder's name (the parent folder's
+  name for a single input file). Point the build at `results/LCR/PF4_polyP/`
+  and its viewers land in `output/LCR/PF4_polyP/`; `results/LCR/polyP/` →
+  `output/LCR/polyP/`. The whole `output/` tree is git-ignored.
+- `--serve` — after building, also serve the viewer(s) on a localhost address
+  and open the browser, so the viewer's **Save preset** button writes
+  `preset.json` directly (see [Saving a preset](#saving-a-preset)).
 
-Each viewer is named `LCR_mz<precursor>_<YYYYMMDD-HHMM>.html`. The precursor
+Each run writes two files per spectrum into `OUTPUT_DIR`: the viewer
+`LCR_mz<precursor>_<YYYYMMDD-HHMM>.html` and a sibling processed CSV with the
+same stem (see [Sibling CSV file](#sibling-csv-file)). The precursor
 m/z is read from the spectrum filename's trailing number when present
 (`PF4_polyP_3300.xy` → `3300`, decimals allowed); otherwise it is inferred
 from the base peak. A filename precursor also anchors the scaling threshold to
@@ -60,6 +70,18 @@ live-editable in the viewer; the preset only sets the starting point.
 The generated HTML is fully self-contained (Plotly inlined) and works offline —
 no data leaves the machine.
 
+### Sibling CSV file
+
+Every build writes a processed CSV next to the viewer it belongs to, with the
+same stem (`LCR_mz3300_….html` → `LCR_mz3300_….csv`). It holds the
+`m/z,intensity_processed` spectrum after the full scale + smooth pipeline, run
+with the **preset** parameters — the build computes it directly, no browser
+needed, and it matches the viewer's export at its starting settings exactly.
+The viewer's header shows a **Sibling CSV file** hyperlink to it. The CSV is a
+fixed snapshot: if you edit the controls in the viewer it does not change —
+re-run the build to refresh it, or use the live options below for the current
+on-screen settings.
+
 ### Live-synced CSV
 
 The viewer has a **Link CSV file** button: in Chrome or Edge, pick a `.csv`
@@ -74,9 +96,17 @@ Tune the controls in any viewer, then click **Save preset** to write a
 loads it and uses its values as the control defaults. The built-in `PRESET`
 dict in the script is the fallback when no `preset.json` is present.
 
-In Chrome or Edge, Save preset writes the file directly; other browsers
-download `preset.json`, which you then move next to the script. `preset.json`
-is git-ignored — it is local tuning state.
+How **Save preset** delivers the file depends on how the viewer was opened:
+
+- **Served** (`build_lcr_viewer.py --serve …`) — Save preset POSTs to the
+  localhost server, which writes `preset.json` next to the script directly:
+  one click, no dialog. The status line confirms *"saved to preset.json"*.
+- **Opened as a file** in Chrome or Edge — Save preset writes the file via a
+  save dialog; point it at the script folder.
+- **Other browsers** — Save preset downloads `preset.json`, which you then
+  move next to the script.
+
+`preset.json` is git-ignored — it is local tuning state.
 
 ## Tests
 

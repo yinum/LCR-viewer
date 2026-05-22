@@ -16,17 +16,21 @@ Pipeline exposed in the HTML (live, editable):
      continuous line. Methods: Savitzky-Golay, adjacent averaging, Gaussian,
      binomial, median/percentile.
 
-Usage:  python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
+Usage:  python3 build_lcr_viewer.py [--serve] INPUT [OUTPUT_DIR]
 INPUT is a 2-column m/z, intensity file (whitespace- or comma-delimited),
-or a folder of such files. One viewer is written per spectrum, named by
-precursor ion m/z, into OUTPUT_DIR (default: ../../outputs/LCR/individual
-peaks). Processing parameters come from load_preset() -- the built-in PRESET
+or a folder of such files. Per spectrum, two files are written into OUTPUT_DIR
+(default: output/LCR/<dataset> beside this script, where <dataset> is the input
+folder's name): the viewer HTML and a sibling processed CSV with the same stem
+-- a preset-parameter snapshot the viewer links to. Processing parameters come
+from load_preset() -- the built-in PRESET
 overlaid with a viewer-saved preset.json; the scaling threshold is auto-placed
-per spectrum.
+per spectrum. With --serve, the built viewers are also served on localhost so
+the viewer's "Save preset" button writes preset.json directly (one click, no
+file dialog); plain runs and standalone file:// viewers are unaffected.
 The Plotly basic bundle (plotly-basic.min.js) must sit next to this script;
 download once from https://cdn.plot.ly/plotly-basic-2.35.2.min.js
 """
-import sys, os, json, re, datetime
+import sys, os, json, re, math, datetime
 
 # Built-in fallback preset. load_preset() overlays preset.json (written by the
 # viewer's Save preset button) on top of these; these values are used whenever
@@ -57,6 +61,16 @@ def load_preset(here):
         if k in saved:
             eff[k] = saved[k]
     return eff
+
+def save_posted_preset(here, data):
+    """Write preset.json next to the script from a posted preset dict; only
+    keys present in PRESET are kept. Used by --serve when the viewer's
+    "Save preset" button POSTs its current settings. Returns the written path."""
+    clean = {k: data[k] for k in PRESET if k in data}
+    path = os.path.join(here, "preset.json")
+    with open(path, "w") as fh:
+        json.dump(clean, fh, indent=2)
+    return path
 
 def parse_spectrum(path):
     """Read a 2-column m/z, intensity file (whitespace- or comma-delimited).
@@ -167,12 +181,209 @@ def iter_spectrum_files(path):
         return out
     return [path]
 
+# ---------------------------------------------------------------------------
+# Build-time processing pipeline -- a Python mirror of the in-HTML JS pipeline
+# (buildGrid + smoothAll + buildCSV). It exists so a build can write the
+# sibling processed CSV without a browser: the viewer still owns the live,
+# editable pipeline, this just reproduces it for the preset-default snapshot.
+# Keep this in lockstep with the TEMPLATE JS if either side changes.
+# ---------------------------------------------------------------------------
+GRID_DX = 0.002    # target fine-grid resolution (m/z); see TEMPLATE buildGrid
+MAX_CELLS = 6000   # per-segment grid-cell cap
+PAD_MZ = 0.5       # width of zero-baseline padding on each side of a peak group
+
+def _jround(v):
+    """Round half up, matching JavaScript Math.round (Python round() banker-
+    rounds, which would drift the grid-cell and window counts off the JS)."""
+    return math.floor(v + 0.5)
+
+def build_grid(mz, it):
+    """Mirror of the in-HTML buildGrid: split into peak-group segments, linearly
+    resample each onto a fine uniform m/z grid, pad with zero-baseline cells.
+    Returns (gmz, git, bounds); each bounds entry is [start, end, step]."""
+    n = len(mz)
+    gaps = sorted(mz[i] - mz[i - 1] for i in range(1, n)
+                  if 0 < mz[i] - mz[i - 1] < 0.5)
+    dx0 = gaps[(len(gaps) - 1) // 2] if gaps else 0.02
+    gmz, git, bounds = [], [], []
+    for s, e in find_segments(mz):
+        m0, m1 = mz[s], mz[e]
+        g_start = len(gmz)
+        if e > s and m1 > m0:
+            dx_target = min(GRID_DX, dx0)
+            ncell = _jround((m1 - m0) / dx_target) + 1
+            ncell = max(2, min(ncell, MAX_CELLS))
+            step = (m1 - m0) / (ncell - 1)
+            npad = _jround(PAD_MZ / step)
+            for c in range(npad, 0, -1):           # leading zero-baseline pad
+                gmz.append(m0 - c * step); git.append(0.0)
+            j = s
+            for c in range(ncell):                 # linear-interpolate raw -> grid
+                x = m0 + c * step
+                while j < e and mz[j + 1] < x:
+                    j += 1
+                x0, x1 = mz[j], mz[j + 1]
+                if x1 == x0:
+                    y = max(it[j], it[j + 1])
+                else:
+                    t = (x - x0) / (x1 - x0)
+                    t = 0.0 if t < 0 else (1.0 if t > 1 else t)
+                    y = it[j] + t * (it[j + 1] - it[j])
+                gmz.append(x); git.append(y)
+            for c in range(1, npad + 1):           # trailing zero-baseline pad
+                gmz.append(m1 + c * step); git.append(0.0)
+            bounds.append([g_start, len(gmz) - 1, step])
+        else:
+            for k in range(s, e + 1):
+                gmz.append(mz[k]); git.append(it[k])
+            bounds.append([g_start, len(gmz) - 1, 0.0])
+    return gmz, git, bounds
+
+def _clamp_win(w):
+    """Odd point window in [3, 8001] -- mirror of the in-HTML clampWin."""
+    w = _jround(w)
+    if w % 2 == 0:
+        w += 1
+    return max(3, min(w, 8001))
+
+def _vat(y, i):
+    """Zero-padded element access (the baseline outside a segment is zero)."""
+    return y[i] if 0 <= i < len(y) else 0.0
+
+def _moving_avg(y, w):
+    """O(n) running-sum moving average."""
+    n, h = len(y), (w - 1) // 2
+    o = [0.0] * n
+    if n == 0:
+        return o
+    s = sum(_vat(y, j) for j in range(-h, h + 1))
+    o[0] = s / w
+    for i in range(1, n):
+        s += _vat(y, i + h) - _vat(y, i - h - 1)
+        o[i] = s / w
+    return o
+
+def _gauss_kernel(w):
+    h, sig = (w - 1) // 2, w / 6.0
+    k = [math.exp(-(j * j) / (2 * sig * sig)) for j in range(-h, h + 1)]
+    s = sum(k)
+    return [v / s for v in k]
+
+def _convolve(y, kernel):
+    w, n = len(kernel), len(y)
+    h = (w - 1) // 2
+    return [sum(_vat(y, i + j) * kernel[j + h] for j in range(-h, h + 1))
+            for i in range(n)]
+
+def _median_filt(y, w):
+    h = (w - 1) // 2
+    out = []
+    for i in range(len(y)):
+        win = sorted(_vat(y, i + j) for j in range(-h, h + 1))
+        out.append(win[(len(win) - 1) >> 1])
+    return out
+
+def _binomial(y, w):
+    o, k = list(y), [0.25, 0.5, 0.25]
+    for _ in range((w - 1) // 2):
+        o = _convolve(o, k)
+    return o
+
+def _invert(M):
+    """Gauss-Jordan matrix inverse -- mirror of the in-HTML invert."""
+    n = len(M)
+    A = [list(M[i]) + [1.0 if i == j else 0.0 for j in range(n)]
+         for i in range(n)]
+    for c in range(n):
+        piv = c
+        for r in range(c + 1, n):
+            if abs(A[r][c]) > abs(A[piv][c]):
+                piv = r
+        A[c], A[piv] = A[piv], A[c]
+        d = A[c][c] or 1e-12
+        for j in range(2 * n):
+            A[c][j] /= d
+        for r in range(n):
+            if r == c:
+                continue
+            f = A[r][c]
+            for j in range(2 * n):
+                A[r][j] -= f * A[c][j]
+    return [row[n:] for row in A]
+
+def _savgol(y, w, p):
+    """Savitzky-Golay smoothing -- mirror of the in-HTML savgol/savgolM."""
+    n = len(y)
+    if w < 3:
+        return list(y)
+    if p >= w:
+        p = w - 1
+    h = (w - 1) // 2
+    A = [[float(j) ** k for k in range(p + 1)] for j in range(-h, h + 1)]
+    ata = [[sum(A[j][a] * A[j][b] for j in range(w)) for b in range(p + 1)]
+           for a in range(p + 1)]
+    inv = _invert(ata)
+    coef = [sum(inv[0][m] * A[j][m] for m in range(p + 1)) for j in range(w)]
+    return [sum(coef[j + h] * _vat(y, i + j) for j in range(-h, h + 1))
+            for i in range(n)]
+
+def smooth_all(y, bounds, method, width_mz, p):
+    """Apply the chosen smoothing per peak-group segment -- mirror of the
+    in-HTML smoothAll. width_mz becomes a point window via each segment's
+    grid step, so the smoothing covers the same m/z span on every peak."""
+    if method == "none":
+        return list(y)
+    o = list(y)
+    for b0, b1, step in bounds:
+        seg = y[b0:b1 + 1]
+        if len(seg) < 3:
+            continue
+        ww = _clamp_win(width_mz / step if step > 0 else 3)
+        if method == "avg":
+            sm = _moving_avg(seg, ww)
+        elif method == "gauss":
+            sm = _convolve(seg, _gauss_kernel(ww))
+        elif method == "binom":
+            sm = _binomial(seg, ww)
+        elif method == "median":
+            sm = _median_filt(seg, ww)
+        elif method == "sg":
+            sm = _savgol(seg, ww, p)
+        else:
+            sm = seg
+        for i, v in enumerate(sm):
+            o[b0 + i] = v
+    return o
+
+def process_spectrum(mz, it, thr, preset):
+    """Run the viewer's scale + smooth pipeline in Python with the preset's
+    parameters; return (proc_x, proc_y) -- fine-grid m/z and processed
+    intensity. Mirrors the in-HTML recompute() so a build-time CSV equals the
+    viewer's export at its default (preset) settings."""
+    gmz, git, bounds = build_grid(mz, it)
+    factor = preset["scale"]
+    scaled = [(v * factor if gmz[i] >= thr else v) for i, v in enumerate(git)]
+    proc_y = smooth_all(scaled, bounds, preset["method"],
+                        preset["width_mz"], preset["poly"])
+    return gmz, proc_y
+
+def build_csv(proc_x, proc_y):
+    """Processed-CSV text: an 'm/z,intensity_processed' header then one row per
+    grid point with positive intensity (zero-baseline grid and pad cells are
+    dropped) -- identical in form to the viewer's buildCSV()."""
+    lines = ["m/z,intensity_processed"]
+    for x, y in zip(proc_x, proc_y):
+        if y > 0:
+            lines.append("%s,%s" % (x, y))
+    return "\n".join(lines) + "\n"
+
 def build_html(mz, it, thr, plotly, html_name, preset):
     """Assemble a self-contained viewer HTML from spectrum data, the
     per-spectrum threshold, and the inlined Plotly bundle. Control defaults
     come from the effective preset (see load_preset). The processed-CSV
-    download/link reuses html_name's stem so the CSV matches its viewer
-    (LCR_mz<precursor>_<timestamp>.csv)."""
+    download/link/sibling-file reuses html_name's stem so the CSV matches its
+    viewer (LCR_mz<precursor>_<timestamp>.csv); the header hyperlink points at
+    that sibling file written next to the viewer (see main)."""
     csv_name = os.path.splitext(os.path.basename(html_name))[0] + ".csv"
     html = TEMPLATE
     html = html.replace("__SCALE__", str(preset["scale"]))
@@ -183,17 +394,103 @@ def build_html(mz, it, thr, plotly, html_name, preset):
     html = html.replace('value="%s"' % preset["method"],
                         'value="%s" selected' % preset["method"])
     html = html.replace("__CSVNAME__", json.dumps(csv_name))
+    html = html.replace("__CSVHREF__", csv_name)
     html = html.replace("__MZ__", json.dumps(mz))
     html = html.replace("__IT__", json.dumps(it))
     html = html.replace("__PLOTLY__", plotly)
     return html
 
+def parse_args(argv, here):
+    """Parse CLI args into (serve_mode, src, out_dir). A --serve flag anywhere
+    in argv enables localhost serve mode; the remaining positionals are INPUT
+    then OUTPUT_DIR. When OUTPUT_DIR is omitted it defaults to
+    <here>/output/LCR/<dataset> -- a subfolder of the code repo -- where
+    <dataset> is the input folder's name (the parent folder's name for a single
+    input file), so each dataset's viewers land in their own subfolder."""
+    serve_mode = "--serve" in argv
+    pos = [a for a in argv if a != "--serve"]
+    src = pos[0] if len(pos) > 0 else os.path.join(here, "clipboard_spectrum.txt")
+    if len(pos) > 1:
+        out_dir = pos[1]
+    else:
+        folder = src if os.path.isdir(src) else os.path.dirname(
+            os.path.abspath(src))
+        dataset = os.path.basename(os.path.abspath(folder)) or "LCR"
+        out_dir = os.path.join(here, "output", "LCR", dataset)
+    return serve_mode, src, out_dir
+
+def serve(out_dir, written, csv_written, here):
+    """Serve the freshly built viewers (and their sibling CSVs) on localhost
+    (127.0.0.1) and accept the viewer's "Save preset" POSTs, writing preset.json
+    next to the script. Runs until interrupted (Ctrl-C). Standalone viewers
+    opened as file:// are unaffected -- this is only a convenience launcher;
+    no data leaves the host."""
+    import http.server, webbrowser
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass  # keep the console quiet
+
+        def _send(self, code, body, ctype="text/html; charset=utf-8"):
+            data = body if isinstance(body, bytes) else body.encode("utf-8")
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def do_GET(self):
+            page = self.path.split("?")[0].lstrip("/")
+            if page == "" and len(written) > 1:
+                links = "".join('<li><a href="%s">%s</a></li>' % (n, n)
+                                for n in written)
+                self._send(200, "<!doctype html><meta charset=utf-8>"
+                           "<title>LCR viewers</title><h2>LCR viewers</h2>"
+                           "<ul>%s</ul>" % links)
+                return
+            if page == "":
+                page = written[0]
+            if page in written:
+                with open(os.path.join(out_dir, page), "rb") as fh:
+                    self._send(200, fh.read())
+            elif page in csv_written:
+                with open(os.path.join(out_dir, page), "rb") as fh:
+                    self._send(200, fh.read(), "text/csv; charset=utf-8")
+            else:
+                self._send(404, "not found")
+
+        def do_POST(self):
+            if self.path.split("?")[0].rstrip("/") != "/preset":
+                self._send(404, "not found"); return
+            try:
+                n = int(self.headers.get("Content-Length", 0))
+                data = json.loads(self.rfile.read(n).decode("utf-8"))
+                path = save_posted_preset(here, data)
+                self._send(200, json.dumps({"ok": True}), "application/json")
+                print("preset saved -> %s" % path)
+            except (ValueError, OSError) as e:
+                self._send(400, json.dumps({"ok": False, "error": str(e)}),
+                           "application/json")
+
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    url = "http://127.0.0.1:%d/" % srv.server_address[1]
+    print("\nServing %d viewer(s) at %s" % (len(written), url))
+    print('"Save preset" in the viewer now writes preset.json directly. '
+          "Ctrl-C to stop.")
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        print("\nstopped")
+    finally:
+        srv.server_close()
+
 def main():
-    args = sys.argv[1:]
     here = os.path.dirname(os.path.abspath(__file__))
-    src = args[0] if len(args) > 0 else os.path.join(here, "clipboard_spectrum.txt")
-    out_dir = args[1] if len(args) > 1 else os.path.normpath(
-        os.path.join(here, "..", "..", "outputs", "LCR", "individual peaks"))
+    serve_mode, src, out_dir = parse_args(sys.argv[1:], here)
     os.makedirs(out_dir, exist_ok=True)
 
     with open(os.path.join(here, "plotly-basic.min.js")) as fh:
@@ -204,6 +501,7 @@ def main():
     if not files:
         sys.exit("No spectrum files found at " + src)
 
+    written, csv_written = [], []
     for path in files:
         try:
             mz, it = parse_spectrum(path)
@@ -221,9 +519,22 @@ def main():
         out = os.path.join(out_dir, name)
         with open(out, "w") as fh:
             fh.write(html)
-        print("Wrote %s  (precursor m/z %d (%s), threshold %.1f, %d pts, %.1f KB)"
-              % (out, int(round(prec)), source, thr, len(mz),
-                 os.path.getsize(out) / 1024))
+        written.append(name)
+        # sibling processed CSV -- a preset-default snapshot the viewer's
+        # header hyperlink points at (same folder, same stem).
+        csv_name = os.path.splitext(name)[0] + ".csv"
+        proc_x, proc_y = process_spectrum(mz, it, thr, preset)
+        with open(os.path.join(out_dir, csv_name), "w") as fh:
+            fh.write(build_csv(proc_x, proc_y))
+        csv_written.append(csv_name)
+        print("Wrote %s + %s  (precursor m/z %d (%s), threshold %.1f, "
+              "%d pts, %.1f KB)" % (name, csv_name, int(round(prec)), source,
+                                    thr, len(mz), os.path.getsize(out) / 1024))
+
+    if serve_mode:
+        if not written:
+            sys.exit("Nothing built to serve.")
+        serve(out_dir, written, csv_written, here)
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -246,6 +557,7 @@ TEMPLATE = r"""<!DOCTYPE html>
  button:hover{background:#e3e3e3}
  .hint{font-size:11px;color:#888;padding:5px 14px;line-height:1.5}
  #status{color:#0050b3;font-weight:600}
+ #csvfile{font-size:11px;color:#0050b3;word-break:break-all;max-width:240px}
 </style>
 </head>
 <body>
@@ -275,6 +587,9 @@ TEMPLATE = r"""<!DOCTYPE html>
    <span id="csvstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
  <div class="ctl"><button id="savepreset">Save preset</button>
    <span id="presetstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
+ <div class="ctl"><label>Sibling CSV file</label>
+   <a id="csvfile" href="__CSVHREF__" download="__CSVHREF__"
+      title="Processed CSV written next to this viewer at build time, using the preset defaults. Use the Download / Link buttons for the current on-screen settings.">__CSVHREF__</a></div>
 </div>
 <div class="hint">
  Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope stays x1;
@@ -543,6 +858,18 @@ function buildPreset(){
 const presetStat=document.getElementById('presetstat');
 document.getElementById('savepreset').addEventListener('click',async()=>{
  const text=JSON.stringify(buildPreset(),null,2);
+ // Served by build_lcr_viewer.py --serve: POST straight to preset.json.
+ if(location.protocol==='http:'||location.protocol==='https:'){
+  try{
+   const r=await fetch('/preset',{method:'POST',
+     headers:{'Content-Type':'application/json'},body:text});
+   const j=await r.json();
+   presetStat.textContent=j.ok?'saved to preset.json - applies to next build'
+     :'save failed: '+(j.error||r.status);
+  }catch(e){presetStat.textContent='save failed: '+e.message;}
+  return;
+ }
+ // Standalone (file://): File System Access API, with a download fallback.
  if(window.showSaveFilePicker){
   try{
    const h=await window.showSaveFilePicker({

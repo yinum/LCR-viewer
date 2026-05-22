@@ -116,6 +116,13 @@ class TestBuildHtml(unittest.TestCase):
         self.assertIn("LCR_mz2092_20260522-0907.csv", html)
         self.assertNotIn("polyP_LCR_processed.csv", html)
 
+    def test_sibling_csv_hyperlink_present(self):
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
+        self.assertIn('id="csvfile"', html)        # header hyperlink element
+        # links to the sibling CSV file in the same folder
+        self.assertIn('href="LCR_mz2092_20260522-0907.csv"', html)
+        self.assertNotIn("__CSVHREF__", html)      # placeholder fully replaced
+
     def test_custom_preset_overrides_controls(self):
         custom = {"scale": 7, "method": "sg", "width_mz": 0.02,
                   "poly": 2, "show_overlay": True}
@@ -148,10 +155,18 @@ class TestMainIntegration(unittest.TestCase):
             blv.main()
         finally:
             sys.argv = argv
-        files = os.listdir(out)
-        self.assertEqual(len(files), 1)
-        self.assertTrue(files[0].startswith("LCR_mz200_"))
-        self.assertTrue(files[0].endswith(".html"))
+        files = sorted(os.listdir(out))
+        # one viewer HTML + one sibling processed CSV, sharing a stem
+        self.assertEqual(len(files), 2)
+        html = [f for f in files if f.endswith(".html")]
+        csv = [f for f in files if f.endswith(".csv")]
+        self.assertEqual(len(html), 1)
+        self.assertEqual(len(csv), 1)
+        self.assertTrue(html[0].startswith("LCR_mz200_"))
+        self.assertEqual(os.path.splitext(html[0])[0],
+                         os.path.splitext(csv[0])[0])
+        with open(os.path.join(out, csv[0])) as f:
+            self.assertTrue(f.readline().startswith("m/z,intensity_processed"))
         for d in (src, out):
             for n in os.listdir(d):
                 os.unlink(os.path.join(d, n))
@@ -173,9 +188,11 @@ class TestMainIntegration(unittest.TestCase):
             blv.main()
         finally:
             sys.argv = argv
-        files = os.listdir(out)
-        self.assertEqual(len(files), 1)
-        self.assertTrue(files[0].startswith("LCR_mz250_"))
+        files = sorted(os.listdir(out))
+        self.assertEqual(len(files), 2)          # viewer HTML + sibling CSV
+        html = [f for f in files if f.endswith(".html")]
+        self.assertEqual(len(html), 1)
+        self.assertTrue(html[0].startswith("LCR_mz250_"))
         for d in (src, out):
             for n in os.listdir(d):
                 os.unlink(os.path.join(d, n))
@@ -254,6 +271,124 @@ class TestPrecursorThreshold(unittest.TestCase):
         # precursor 130 lies between the clusters; nearest edge is A's (100.2)
         thr = blv.auto_threshold(self.MZ, self.IT, 130.0)
         self.assertAlmostEqual(thr, 100.2 + blv.THRESHOLD_MARGIN, delta=1e-6)
+
+
+class TestParseArgs(unittest.TestCase):
+    def test_serve_flag_detected_and_stripped(self):
+        serve, src, out = blv.parse_args(["--serve", "/data", "/out"], "/here")
+        self.assertTrue(serve)
+        self.assertEqual(src, "/data")
+        self.assertEqual(out, "/out")
+
+    def test_serve_flag_anywhere(self):
+        serve, src, out = blv.parse_args(["/data", "--serve"], "/here")
+        self.assertTrue(serve)
+        self.assertEqual(src, "/data")
+
+    def test_no_serve_flag(self):
+        serve, src, out = blv.parse_args(["/data"], "/here")
+        self.assertFalse(serve)
+        self.assertEqual(src, "/data")
+
+    def test_default_output_from_input_folder_name(self):
+        d = tempfile.mkdtemp()
+        sub = os.path.join(d, "PF4_polyP")
+        os.makedirs(sub)
+        _, src, out = blv.parse_args([sub], "/repo")
+        # dataset subfolder takes the input folder's name
+        self.assertEqual(out, os.path.join("/repo", "output", "LCR", "PF4_polyP"))
+        os.rmdir(sub)
+        os.rmdir(d)
+
+    def test_default_output_from_single_file_parent(self):
+        d = tempfile.mkdtemp()
+        sub = os.path.join(d, "polyP")
+        os.makedirs(sub)
+        f = os.path.join(sub, "run_250.xy")
+        open(f, "w").close()
+        _, src, out = blv.parse_args([f], "/repo")
+        # a single input file -> dataset is its parent folder's name
+        self.assertEqual(out, os.path.join("/repo", "output", "LCR", "polyP"))
+        os.unlink(f)
+        os.rmdir(sub)
+        os.rmdir(d)
+
+    def test_explicit_output_dir_overrides_default(self):
+        _, src, out = blv.parse_args(["/data/PF4_polyP", "/custom/out"], "/repo")
+        self.assertEqual(out, "/custom/out")
+
+
+class TestSavePostedPreset(unittest.TestCase):
+    def test_keeps_only_preset_keys_and_writes(self):
+        d = tempfile.mkdtemp()
+        blv.save_posted_preset(d, {"scale": 5, "width_mz": 0.07,
+                                   "method": "sg", "bogus": 1})
+        with open(os.path.join(d, "preset.json")) as fh:
+            saved = json.load(fh)
+        self.assertEqual(saved["scale"], 5)
+        self.assertEqual(saved["width_mz"], 0.07)
+        self.assertEqual(saved["method"], "sg")
+        self.assertNotIn("bogus", saved)                 # unknown key dropped
+        # round-trips through load_preset
+        self.assertEqual(blv.load_preset(d)["width_mz"], 0.07)
+        os.unlink(os.path.join(d, "preset.json"))
+        os.rmdir(d)
+
+
+class TestServedSavePreset(unittest.TestCase):
+    def test_viewer_supports_served_and_standalone_save(self):
+        html = blv.build_html([100.0, 100.2], [5.0, 9.0], 123.45,
+                              "/*plotly*/", "LCR_mz123_x.html", blv.PRESET)
+        self.assertIn("location.protocol", html)   # served-mode branch
+        self.assertIn("/preset", html)             # POST endpoint
+        self.assertIn("showSaveFilePicker", html)  # standalone fallback kept
+
+
+class TestProcessSpectrum(unittest.TestCase):
+    # one peak cluster (parent envelope) and one small charge-reduced cluster
+    MZ = [200.0, 200.2, 200.4, 200.6, 260.0, 260.2, 260.4]
+    IT = [40.0, 90.0, 50.0, 10.0, 4.0, 6.0, 3.0]
+
+    def test_grid_is_finer_than_raw(self):
+        gmz, git, bounds = blv.build_grid(self.MZ, self.IT)
+        # interpolation onto a fine grid yields far more points than raw
+        self.assertGreater(len(gmz), len(self.MZ))
+        self.assertEqual(len(gmz), len(git))
+        # two raw clusters -> two grid segments
+        self.assertEqual(len(bounds), 2)
+
+    def test_process_returns_paired_arrays(self):
+        px, py = blv.process_spectrum(self.MZ, self.IT, 230.0, blv.PRESET)
+        self.assertEqual(len(px), len(py))
+        self.assertGreater(len(px), 0)
+
+    def test_charge_reduced_region_is_scaled(self):
+        # with no smoothing, a grid point above the threshold is x scale
+        preset = dict(blv.PRESET, method="none", scale=10)
+        px, py = blv.process_spectrum(self.MZ, self.IT, 230.0, preset)
+        gmz, git, _ = blv.build_grid(self.MZ, self.IT)
+        for i, x in enumerate(gmz):
+            if x >= 230.0:
+                self.assertAlmostEqual(py[i], git[i] * 10, delta=1e-6)
+            else:
+                self.assertAlmostEqual(py[i], git[i], delta=1e-6)
+
+    def test_smoothing_changes_the_curve(self):
+        raw = dict(blv.PRESET, method="none")
+        smooth = dict(blv.PRESET, method="avg", width_mz=0.04)
+        _, py_raw = blv.process_spectrum(self.MZ, self.IT, 230.0, raw)
+        _, py_sm = blv.process_spectrum(self.MZ, self.IT, 230.0, smooth)
+        self.assertNotEqual(py_raw, py_sm)
+
+
+class TestBuildCsv(unittest.TestCase):
+    def test_header_and_drops_zero_rows(self):
+        csv = blv.build_csv([100.0, 100.5, 101.0], [0.0, 7.5, 0.0])
+        lines = csv.strip().split("\n")
+        self.assertEqual(lines[0], "m/z,intensity_processed")
+        # only the positive-intensity point survives
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[1], "100.5,7.5")
 
 
 if __name__ == "__main__":

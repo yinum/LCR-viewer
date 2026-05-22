@@ -7,6 +7,9 @@ plotly-basic.min.js
 *.xy
 *.html
 
+# Generated viewers + sibling CSVs land here (output/LCR/<dataset>/) — never commit
+/output/
+
 # Python
 __pycache__/
 *.pyc
