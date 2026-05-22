@@ -91,5 +91,23 @@ class TestIterSpectrumFiles(unittest.TestCase):
         os.rmdir(d)
 
 
+class TestBuildHtml(unittest.TestCase):
+    MZ = [100.0, 100.2, 100.4, 150.0, 150.2]
+    IT = [40.0, 90.0, 50.0, 4.0, 6.0]
+
+    def test_preset_values_baked_in(self):
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/")
+        self.assertIn('id="scale" value="10"', html)
+        self.assertIn('id="win" value="299"', html)
+        self.assertIn('id="thr" value="123.45"', html)
+        self.assertIn('value="avg" selected', html)
+        # overlay preset is False -> rawov checkbox must NOT be checked
+        self.assertNotIn('id="rawov" checked', html)
+        # data and plotly are inlined
+        self.assertIn("/*plotly*/", html)
+        self.assertNotIn("__MZ__", html)
+        self.assertNotIn("__SCALE__", html)
+
+
 if __name__ == "__main__":
     unittest.main()

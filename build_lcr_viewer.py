@@ -22,6 +22,16 @@ download once from https://cdn.plot.ly/plotly-basic-2.35.2.min.js
 """
 import sys, os, json, datetime
 
+# Tuned processing preset applied as the default for every generated viewer.
+# Editing these values is the supported way to change the saved parameters.
+PRESET = {
+    "scale": 10,            # charge-reduced x factor
+    "method": "avg",        # smoothing method (adjacent averaging)
+    "window": 299,          # smoothing window (odd)
+    "poly": 3,              # SG poly order, retained for the SG control
+    "show_overlay": False,  # pre-smoothing overlay checkbox default
+}
+
 def parse_spectrum(path):
     """Read a 2-column m/z, intensity file (whitespace- or comma-delimited).
     Returns (mz, it) lists of floats. Raises ValueError if no numeric rows."""
@@ -107,6 +117,23 @@ def iter_spectrum_files(path):
         return out
     return [path]
 
+def build_html(mz, it, thr, plotly):
+    """Assemble a self-contained viewer HTML from spectrum data, the
+    per-spectrum threshold, and the inlined Plotly bundle. Control defaults
+    come from PRESET."""
+    html = TEMPLATE
+    html = html.replace("__SCALE__", str(PRESET["scale"]))
+    html = html.replace("__THR__", "%g" % thr)
+    html = html.replace("__WIN__", str(PRESET["window"]))
+    html = html.replace("__POLY__", str(PRESET["poly"]))
+    html = html.replace("__RAWOV__", "checked" if PRESET["show_overlay"] else "")
+    html = html.replace('value="%s"' % PRESET["method"],
+                        'value="%s" selected' % PRESET["method"])
+    html = html.replace("__MZ__", json.dumps(mz))
+    html = html.replace("__IT__", json.dumps(it))
+    html = html.replace("__PLOTLY__", plotly)
+    return html
+
 def main():
     src  = sys.argv[1] if len(sys.argv) > 1 else "clipboard_spectrum.txt"
     out  = sys.argv[2] if len(sys.argv) > 2 else "polyP_LCR_viewer.html"
@@ -162,24 +189,24 @@ TEMPLATE = r"""<!DOCTYPE html>
 <body>
 <div id="controls">
  <div class="ctl"><label>Charge-reduced x factor</label>
-   <input type="number" id="scale" value="50" step="1" min="1"></div>
+   <input type="number" id="scale" value="__SCALE__" step="1" min="1"></div>
  <div class="ctl"><label>Scale applies above m/z</label>
-   <input type="number" id="thr" value="2160" step="5"></div>
+   <input type="number" id="thr" value="__THR__" step="5"></div>
  <div class="ctl"><label>Smoothing method</label>
    <select id="method">
      <option value="none">None (raw)</option>
-     <option value="sg" selected>Savitzky-Golay</option>
+     <option value="sg">Savitzky-Golay</option>
      <option value="avg">Adjacent averaging</option>
      <option value="gauss">Gaussian</option>
      <option value="binom">Binomial</option>
      <option value="median">Median / percentile</option>
    </select></div>
  <div class="ctl"><label>Window (odd pts)</label>
-   <input type="number" id="win" value="11" step="2" min="3"></div>
+   <input type="number" id="win" value="__WIN__" step="2" min="3"></div>
  <div class="ctl"><label>Poly order (SG)</label>
-   <input type="number" id="poly" value="3" step="1" min="1" max="6"></div>
+   <input type="number" id="poly" value="__POLY__" step="1" min="1" max="6"></div>
  <div class="ctl chk">
-   <label><input type="checkbox" id="rawov" checked> pre-smoothing overlay</label>
+   <label><input type="checkbox" id="rawov" __RAWOV__> pre-smoothing overlay</label>
    <label><input type="checkbox" id="logy"> log Y axis</label></div>
  <div class="ctl"><button id="dl">Download processed CSV</button></div>
 </div>
