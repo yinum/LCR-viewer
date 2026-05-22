@@ -94,6 +94,19 @@ def output_filename(precursor, when=None):
     when = when or datetime.datetime.now()
     return "LCR_mz%d_%s.html" % (precursor, when.strftime("%Y%m%d-%H%M"))
 
+def iter_spectrum_files(path):
+    """Resolve an input path to a list of spectrum files. A file -> [file];
+    a directory -> its sorted non-hidden .txt and .csv files (non-recursive)."""
+    if os.path.isdir(path):
+        out = []
+        for name in sorted(os.listdir(path)):
+            if name.startswith("."):
+                continue
+            if name.lower().endswith((".txt", ".csv")):
+                out.append(os.path.join(path, name))
+        return out
+    return [path]
+
 def main():
     src  = sys.argv[1] if len(sys.argv) > 1 else "clipboard_spectrum.txt"
     out  = sys.argv[2] if len(sys.argv) > 2 else "polyP_LCR_viewer.html"

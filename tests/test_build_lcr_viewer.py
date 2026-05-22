@@ -73,5 +73,23 @@ class TestOutputFilename(unittest.TestCase):
         self.assertEqual(name, "LCR_mz2092_20260522-0907.html")
 
 
+class TestIterSpectrumFiles(unittest.TestCase):
+    def test_single_file_yields_itself(self):
+        fh = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
+        fh.close()
+        self.assertEqual(blv.iter_spectrum_files(fh.name), [fh.name])
+        os.unlink(fh.name)
+
+    def test_directory_yields_sorted_txt_and_csv(self):
+        d = tempfile.mkdtemp()
+        for name in ["b.txt", "a.csv", "skip.json", ".hidden.txt"]:
+            open(os.path.join(d, name), "w").close()
+        got = [os.path.basename(p) for p in blv.iter_spectrum_files(d)]
+        self.assertEqual(got, ["a.csv", "b.txt"])
+        for name in os.listdir(d):
+            os.unlink(os.path.join(d, name))
+        os.rmdir(d)
+
+
 if __name__ == "__main__":
     unittest.main()
