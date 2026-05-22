@@ -237,6 +237,8 @@ TEMPLATE = r"""<!DOCTYPE html>
  <div class="ctl"><button id="dl">Download processed CSV</button></div>
  <div class="ctl"><button id="link">Link CSV file (live)</button>
    <span id="csvstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
+ <div class="ctl"><button id="savepreset">Save preset</button>
+   <span id="presetstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
 </div>
 <div class="hint">
  Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope stays x1;
@@ -441,6 +443,34 @@ function syncCSV(){
   }catch(e){csvStat.textContent='write failed: '+e.message;}
  },200);
 }
+// ---- save preset.json (File System Access API, download fallback) ----
+function buildPreset(){
+ return {
+  scale:parseFloat(document.getElementById('scale').value)||1,
+  method:document.getElementById('method').value,
+  window:parseInt(document.getElementById('win').value)||3,
+  poly:parseInt(document.getElementById('poly').value)||3,
+  show_overlay:document.getElementById('rawov').checked
+ };
+}
+const presetStat=document.getElementById('presetstat');
+document.getElementById('savepreset').addEventListener('click',async()=>{
+ const text=JSON.stringify(buildPreset(),null,2);
+ if(window.showSaveFilePicker){
+  try{
+   const h=await window.showSaveFilePicker({
+     suggestedName:'preset.json',
+     types:[{description:'JSON',accept:{'application/json':['.json']}}]});
+   const w=await h.createWritable();
+   await w.write(text); await w.close();
+   presetStat.textContent='saved '+h.name+' - keep it next to build_lcr_viewer.py';
+  }catch(e){/* user cancelled the picker */}
+ }else{
+  const blob=new Blob([text],{type:'application/json'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='preset.json';a.click();
+  presetStat.textContent='downloaded preset.json - move it next to build_lcr_viewer.py';
+ }
+});
 recompute();
 </script>
 </body>

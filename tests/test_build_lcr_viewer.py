@@ -118,6 +118,12 @@ class TestBuildHtml(unittest.TestCase):
         self.assertIn('value="sg" selected', html)
         self.assertIn('id="rawov" checked', html)
 
+    def test_save_preset_button_present(self):
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
+        self.assertIn('id="savepreset"', html)   # Save preset button
+        self.assertIn("buildPreset", html)       # JS gathers control values
+        self.assertIn("preset.json", html)       # target filename
+
 
 class TestMainIntegration(unittest.TestCase):
     def test_folder_input_writes_named_viewers(self):
