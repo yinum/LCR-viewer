@@ -135,33 +135,34 @@ def build_html(mz, it, thr, plotly):
     return html
 
 def main():
-    src  = sys.argv[1] if len(sys.argv) > 1 else "clipboard_spectrum.txt"
-    out  = sys.argv[2] if len(sys.argv) > 2 else "polyP_LCR_viewer.html"
+    args = sys.argv[1:]
     here = os.path.dirname(os.path.abspath(__file__))
-
-    mz, it = [], []
-    with open(src) as fh:
-        for line in fh:
-            p = line.split()
-            if len(p) >= 2:
-                try:
-                    mz.append(float(p[0])); it.append(float(p[1]))
-                except ValueError:
-                    pass
-    if not mz:
-        sys.exit("No numeric data parsed from " + src)
+    src = args[0] if len(args) > 0 else os.path.join(here, "clipboard_spectrum.txt")
+    out_dir = args[1] if len(args) > 1 else os.path.normpath(
+        os.path.join(here, "..", "..", "outputs", "LCR", "individual peaks"))
+    os.makedirs(out_dir, exist_ok=True)
 
     with open(os.path.join(here, "plotly-basic.min.js")) as fh:
         plotly = fh.read()
 
-    html = TEMPLATE
-    html = html.replace("__MZ__", json.dumps(mz))
-    html = html.replace("__IT__", json.dumps(it))
-    html = html.replace("__PLOTLY__", plotly)
+    files = iter_spectrum_files(src)
+    if not files:
+        sys.exit("No spectrum files found at " + src)
 
-    with open(out, "w") as fh:
-        fh.write(html)
-    print("Wrote %s  (%d points, %.1f KB)" % (out, len(mz), os.path.getsize(out)/1024))
+    for path in files:
+        try:
+            mz, it = parse_spectrum(path)
+        except (ValueError, OSError) as e:
+            print("skip %s: %s" % (path, e))
+            continue
+        thr = auto_threshold(mz, it)
+        prec = precursor_mz(mz, it)
+        html = build_html(mz, it, thr, plotly)
+        out = os.path.join(out_dir, output_filename(prec))
+        with open(out, "w") as fh:
+            fh.write(html)
+        print("Wrote %s  (precursor m/z %d, threshold %.1f, %d pts, %.1f KB)"
+              % (out, prec, thr, len(mz), os.path.getsize(out) / 1024))
 
 
 TEMPLATE = r"""<!DOCTYPE html>

@@ -116,5 +116,30 @@ class TestBuildHtml(unittest.TestCase):
         self.assertIn('id="dl"', html)             # download fallback kept
 
 
+class TestMainIntegration(unittest.TestCase):
+    def test_folder_input_writes_named_viewers(self):
+        src = tempfile.mkdtemp()
+        out = tempfile.mkdtemp()
+        # one spectrum: parent envelope near m/z 200, small cluster near 260
+        spec = "".join("%.1f %.1f\n" % (m, i) for m, i in [
+            (200.0, 40), (200.2, 90), (200.4, 50), (200.6, 10),
+            (260.0, 4), (260.2, 6), (260.4, 3)])
+        open(os.path.join(src, "run1.txt"), "w").write(spec)
+        argv = sys.argv
+        sys.argv = ["build_lcr_viewer.py", src, out]
+        try:
+            blv.main()
+        finally:
+            sys.argv = argv
+        files = os.listdir(out)
+        self.assertEqual(len(files), 1)
+        self.assertTrue(files[0].startswith("LCR_mz200_"))
+        self.assertTrue(files[0].endswith(".html"))
+        for d in (src, out):
+            for n in os.listdir(d):
+                os.unlink(os.path.join(d, n))
+            os.rmdir(d)
+
+
 if __name__ == "__main__":
     unittest.main()
