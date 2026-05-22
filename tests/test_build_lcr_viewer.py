@@ -62,6 +62,13 @@ class TestOutputFilename(unittest.TestCase):
         name = blv.output_filename(2092, when)
         self.assertEqual(name, "LCR_mz2092_20260522-0907.html")
 
+    def test_rounds_float_precursor(self):
+        when = datetime.datetime(2026, 5, 22, 9, 7)
+        self.assertEqual(blv.output_filename(3300.0, when),
+                         "LCR_mz3300_20260522-0907.html")
+        self.assertEqual(blv.output_filename(3300.7, when),
+                         "LCR_mz3301_20260522-0907.html")
+
 
 class TestIterSpectrumFiles(unittest.TestCase):
     def test_single_file_yields_itself(self):

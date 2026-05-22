@@ -145,9 +145,12 @@ def auto_threshold(mz, it, precursor=None):
     return mz[parent[1]] + THRESHOLD_MARGIN
 
 def output_filename(precursor, when=None):
-    """Per-spectrum viewer filename: LCR_mz<precursor>_<YYYYMMDD-HHMM>.html"""
+    """Per-spectrum viewer filename: LCR_mz<precursor>_<YYYYMMDD-HHMM>.html.
+    precursor may be a float (parsed from a filename); it is rounded for the
+    integer label."""
     when = when or datetime.datetime.now()
-    return "LCR_mz%d_%s.html" % (precursor, when.strftime("%Y%m%d-%H%M"))
+    return "LCR_mz%d_%s.html" % (int(round(precursor)),
+                                 when.strftime("%Y%m%d-%H%M"))
 
 def iter_spectrum_files(path):
     """Resolve an input path to a list of spectrum files. A file -> [file];
