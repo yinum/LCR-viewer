@@ -6,12 +6,15 @@ self-contained interactive HTML viewer. User-facing detail is in `README.md`.
 
 ## Project layout & boundaries
 
-This repo lives at `PolyP/code/LCR-viewer/`. The parent `PolyP/` folder and
-its sibling directories (`data/`, `results/`, `outputs/`, `meetings/`, …) hold
-years of **private scientific data and personal information** — do not read,
-move, or commit anything outside this repo folder. All code projects live under
-`PolyP/code/<project>/`, each in its own subfolder; never put code loose in the
-`PolyP/` root.
+This repo lives at `PolyP/code/LCR-viewer/`. The sibling directories under
+`PolyP/` (`data/`, `results/`, `outputs/`, `meetings/`, …) hold years of
+**private scientific data and personal information**. The tool legitimately
+reads input spectra from those areas and writes generated viewers into
+`PolyP/outputs/LCR/individual peaks/` — the boundary that matters is **git**:
+never commit data, generated viewers, or anything from outside this repo folder,
+and never modify the `data/` / `results/` / `meetings/` directories. All code
+projects live under `PolyP/code/<project>/`, each in its own subfolder; never
+put code loose in the `PolyP/` root.
 
 ## Run
 
@@ -28,8 +31,9 @@ script (git-ignored — download once per `README.md`). Tests:
 
 ## Conventions
 
-- Commit **code only**. Spectra (`*.txt`, `*.csv`), generated viewers (`*.html`),
-  and the vendored `plotly-basic.min.js` are git-ignored — keep it that way.
+- Commit **code only**. Spectra (`*.txt`, `*.csv`, `*.xy`), generated viewers
+  (`*.html`), a viewer-saved `preset.json`, and the vendored
+  `plotly-basic.min.js` are git-ignored — keep it that way.
 - Remote: `github.com/yinum/LCR-viewer` (private). Push when the user asks.
 - The generated HTML must stay fully self-contained (Plotly inlined) and work
   offline — no data leaves the machine.

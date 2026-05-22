@@ -4,6 +4,7 @@ plotly-basic.min.js
 # Input spectra and generated viewers (data / outputs — never commit)
 *.txt
 *.csv
+*.xy
 *.html
 
 # Python
