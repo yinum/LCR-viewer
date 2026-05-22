@@ -140,7 +140,7 @@ class TestMainIntegration(unittest.TestCase):
         spec = "".join("%.1f %.1f\n" % (m, i) for m, i in [
             (200.0, 40), (200.2, 90), (200.4, 50), (200.6, 10),
             (260.0, 4), (260.2, 6), (260.4, 3)])
-        with open(os.path.join(src, "run1.txt"), "w") as f:
+        with open(os.path.join(src, "run.txt"), "w") as f:
             f.write(spec)
         argv = sys.argv
         sys.argv = ["build_lcr_viewer.py", src, out]
@@ -152,6 +152,30 @@ class TestMainIntegration(unittest.TestCase):
         self.assertEqual(len(files), 1)
         self.assertTrue(files[0].startswith("LCR_mz200_"))
         self.assertTrue(files[0].endswith(".html"))
+        for d in (src, out):
+            for n in os.listdir(d):
+                os.unlink(os.path.join(d, n))
+            os.rmdir(d)
+
+
+    def test_filename_precursor_names_the_viewer(self):
+        src = tempfile.mkdtemp()
+        out = tempfile.mkdtemp()
+        # base peak is near m/z 600, but the filename says precursor 250
+        spec = "".join("%.1f %.1f\n" % (m, i) for m, i in [
+            (250.0, 30), (250.2, 45), (250.4, 25),
+            (600.0, 40), (600.2, 95), (600.4, 50)])
+        with open(os.path.join(src, "sample_250.txt"), "w") as f:
+            f.write(spec)
+        argv = sys.argv
+        sys.argv = ["build_lcr_viewer.py", src, out]
+        try:
+            blv.main()
+        finally:
+            sys.argv = argv
+        files = os.listdir(out)
+        self.assertEqual(len(files), 1)
+        self.assertTrue(files[0].startswith("LCR_mz250_"))
         for d in (src, out):
             for n in os.listdir(d):
                 os.unlink(os.path.join(d, n))

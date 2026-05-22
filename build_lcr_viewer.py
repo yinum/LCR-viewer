@@ -208,15 +208,20 @@ def main():
         except (ValueError, OSError) as e:
             print("skip %s: %s" % (path, e))
             continue
-        thr = auto_threshold(mz, it)
-        prec = precursor_mz(mz, it)
+        named = precursor_from_name(path)
+        thr = auto_threshold(mz, it, named)
+        if named is not None:
+            prec, source = named, "from filename"
+        else:
+            prec, source = precursor_mz(mz, it), "base peak"
         name = output_filename(prec)
         html = build_html(mz, it, thr, plotly, name, preset)
         out = os.path.join(out_dir, name)
         with open(out, "w") as fh:
             fh.write(html)
-        print("Wrote %s  (precursor m/z %d, threshold %.1f, %d pts, %.1f KB)"
-              % (out, prec, thr, len(mz), os.path.getsize(out) / 1024))
+        print("Wrote %s  (precursor m/z %d (%s), threshold %.1f, %d pts, %.1f KB)"
+              % (out, int(round(prec)), source, thr, len(mz),
+                 os.path.getsize(out) / 1024))
 
 
 TEMPLATE = r"""<!DOCTYPE html>
