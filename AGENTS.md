@@ -16,11 +16,15 @@ move, or commit anything outside this repo folder. All code projects live under
 ## Run
 
 ```sh
-python3 build_lcr_viewer.py INPUT.txt OUTPUT.html
+python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
 ```
 
-INPUT is whitespace/tab-delimited `m/z  intensity`. `plotly-basic.min.js` must
-sit next to the script (git-ignored — download once per `README.md`).
+`INPUT` is a 2-column m/z, intensity file (whitespace- or comma-delimited) or a
+folder of them; a folder builds one viewer per `.txt`/`.csv` file. `OUTPUT_DIR`
+defaults to `../../outputs/LCR/individual peaks`. Each viewer is named
+`LCR_mz<precursor>_<timestamp>.html`. `plotly-basic.min.js` must sit next to the
+script (git-ignored — download once per `README.md`). Tests:
+`python3 -m unittest discover -s tests -v`.
 
 ## Conventions
 
@@ -33,7 +37,8 @@ sit next to the script (git-ignored — download once per `README.md`).
 ## How it works
 
 - **Scaling** — charge-reduced region (m/z ≥ threshold) ×factor; parent envelope
-  stays ×1.
+  stays ×1. The threshold is auto-placed per spectrum just past the parent
+  envelope (`auto_threshold`); fixed parameters live in the `PRESET` dict.
 - **Smoothing** — each peak group is resampled onto a uniform m/z grid, then
   smoothed with zero-baseline padding, so a window of N affects every peak and
   the result equals Origin smoothing the full continuous profile.

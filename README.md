@@ -29,14 +29,43 @@ curl -sL https://cdn.plot.ly/plotly-basic-2.35.2.min.js -o plotly-basic.min.js
 
 ## Usage
 
-Input is a whitespace/tab-delimited two-column file: `m/z  intensity`.
+Input is a 2-column m/z, intensity file (whitespace-, tab-, or comma-delimited),
+or a folder of such files.
 
 ```sh
-python3 build_lcr_viewer.py INPUT.txt OUTPUT.html
+python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
 ```
+
+- `INPUT` — a single spectrum file, or a folder; a folder builds one viewer
+  per `.txt`/`.csv` file inside it.
+- `OUTPUT_DIR` — optional; defaults to `../../outputs/LCR/individual peaks`
+  (the workspace `outputs/` data area).
+
+Each viewer is named `LCR_mz<precursor>_<YYYYMMDD-HHMM>.html`, where
+`<precursor>` is the parent-envelope (base-peak) m/z. The timestamp means
+re-runs never overwrite a prior viewer.
+
+Processing parameters are fixed by the `PRESET` dict at the top of the script
+(charge-reduced ×10, adjacent-averaging smoothing, window 299, pre-smoothing
+overlay hidden). The "scale applies above m/z" threshold is auto-placed per
+spectrum, just past the parent envelope. All values stay live-editable in the
+viewer; the preset only sets the starting point.
 
 The generated HTML is fully self-contained (Plotly inlined) and works offline —
 no data leaves the machine.
+
+### Live-synced CSV
+
+The viewer has a **Link CSV file** button: in Chrome or Edge, pick a `.csv`
+once and it is rewritten automatically on every parameter change. Other
+browsers fall back to the **Download processed CSV** button, which regenerates
+the CSV from current parameters on each click.
+
+## Tests
+
+```sh
+python3 -m unittest discover -s tests -v
+```
 
 ## Note
 

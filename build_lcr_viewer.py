@@ -15,8 +15,12 @@ Pipeline exposed in the HTML (live, editable):
      The spectrum is drawn as one continuous line. Methods: Savitzky-Golay,
      adjacent averaging, Gaussian, binomial, median/percentile.
 
-Usage:  python3 build_lcr_viewer.py INPUT.txt OUTPUT.html
-INPUT is whitespace/tab-delimited two columns: m/z  intensity
+Usage:  python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
+INPUT is a 2-column m/z, intensity file (whitespace- or comma-delimited),
+or a folder of such files. One viewer is written per spectrum, named by
+precursor ion m/z, into OUTPUT_DIR (default: ../../outputs/LCR/individual
+peaks). Processing parameters come from PRESET; the scaling threshold is
+auto-placed per spectrum.
 The Plotly basic bundle (plotly-basic.min.js) must sit next to this script;
 download once from https://cdn.plot.ly/plotly-basic-2.35.2.min.js
 """
