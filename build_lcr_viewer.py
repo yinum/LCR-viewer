@@ -5,7 +5,7 @@ Build a self-contained interactive HTML viewer for a polyP limited-charge-reduct
 (LCR) MS spectrum.
 
 Pipeline exposed in the HTML (live, editable):
-  1. Scale the charge-reduced region (m/z >= threshold) by a factor (default 50x);
+  1. Scale the charge-reduced region (m/z >= threshold) by a factor (PRESET, 10x);
      parent envelope stays 1x.
   2. Smooth the spectrum. Each peak group is resampled onto a uniform m/z grid
      (collapsed baseline restored as zeros) and smoothed with zero-baseline
@@ -218,7 +218,7 @@ TEMPLATE = r"""<!DOCTYPE html>
    <span id="csvstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
 </div>
 <div class="hint">
- Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope ~m/z 2092 stays x1;
+ Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope stays x1;
  (2) smoothing on a uniform m/z grid with zero-baseline padding - a window of N affects
  every peak (large or small), drawn as one continuous spectrum. Matches Origin's
  continuous-profile smoothing. Edit any control - plot updates live. <span id="status"></span>

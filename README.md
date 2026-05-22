@@ -5,7 +5,7 @@ Builds a self-contained interactive HTML viewer for a polyP limited-charge-reduc
 
 The viewer lets you:
 
-1. **Scale** the charge-reduced region (`m/z >= threshold`) by a factor (default 50x),
+1. **Scale** the charge-reduced region (`m/z >= threshold`) by a factor (preset 10x),
    leaving the parent envelope at 1x.
 2. **Smooth** the spectrum with an Origin-style method dropdown
    (Savitzky-Golay, adjacent averaging, Gaussian, binomial, median/percentile).

@@ -124,7 +124,8 @@ class TestMainIntegration(unittest.TestCase):
         spec = "".join("%.1f %.1f\n" % (m, i) for m, i in [
             (200.0, 40), (200.2, 90), (200.4, 50), (200.6, 10),
             (260.0, 4), (260.2, 6), (260.4, 3)])
-        open(os.path.join(src, "run1.txt"), "w").write(spec)
+        with open(os.path.join(src, "run1.txt"), "w") as f:
+            f.write(spec)
         argv = sys.argv
         sys.argv = ["build_lcr_viewer.py", src, out]
         try:
