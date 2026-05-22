@@ -84,9 +84,10 @@ class TestIterSpectrumFiles(unittest.TestCase):
 class TestBuildHtml(unittest.TestCase):
     MZ = [100.0, 100.2, 100.4, 150.0, 150.2]
     IT = [40.0, 90.0, 50.0, 4.0, 6.0]
+    NAME = "LCR_mz2092_20260522-0907.html"
 
     def test_preset_values_baked_in(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/")
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME)
         self.assertIn('id="scale" value="10"', html)
         self.assertIn('id="win" value="299"', html)
         self.assertIn('id="thr" value="123.45"', html)
@@ -99,11 +100,14 @@ class TestBuildHtml(unittest.TestCase):
         self.assertNotIn("__SCALE__", html)
 
     def test_linked_csv_feature_present(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/")
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME)
         self.assertIn('id="link"', html)          # Link CSV button
         self.assertIn("showSaveFilePicker", html)  # File System Access API
         self.assertIn("buildCSV", html)            # shared CSV helper
         self.assertIn('id="dl"', html)             # download fallback kept
+        # processed CSV name shares the viewer's stem (LCR_mz..._....csv)
+        self.assertIn("LCR_mz2092_20260522-0907.csv", html)
+        self.assertNotIn("polyP_LCR_processed.csv", html)
 
 
 class TestMainIntegration(unittest.TestCase):

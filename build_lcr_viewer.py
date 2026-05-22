@@ -116,10 +116,12 @@ def iter_spectrum_files(path):
         return out
     return [path]
 
-def build_html(mz, it, thr, plotly):
+def build_html(mz, it, thr, plotly, html_name):
     """Assemble a self-contained viewer HTML from spectrum data, the
     per-spectrum threshold, and the inlined Plotly bundle. Control defaults
-    come from PRESET."""
+    come from PRESET. The processed-CSV download/link reuses html_name's stem
+    so the CSV matches its viewer (LCR_mz<precursor>_<timestamp>.csv)."""
+    csv_name = os.path.splitext(os.path.basename(html_name))[0] + ".csv"
     html = TEMPLATE
     html = html.replace("__SCALE__", str(PRESET["scale"]))
     html = html.replace("__THR__", "%g" % thr)
@@ -128,6 +130,7 @@ def build_html(mz, it, thr, plotly):
     html = html.replace("__RAWOV__", "checked" if PRESET["show_overlay"] else "")
     html = html.replace('value="%s"' % PRESET["method"],
                         'value="%s" selected' % PRESET["method"])
+    html = html.replace("__CSVNAME__", json.dumps(csv_name))
     html = html.replace("__MZ__", json.dumps(mz))
     html = html.replace("__IT__", json.dumps(it))
     html = html.replace("__PLOTLY__", plotly)
@@ -156,8 +159,9 @@ def main():
             continue
         thr = auto_threshold(mz, it)
         prec = precursor_mz(mz, it)
-        html = build_html(mz, it, thr, plotly)
-        out = os.path.join(out_dir, output_filename(prec))
+        name = output_filename(prec)
+        html = build_html(mz, it, thr, plotly, name)
+        out = os.path.join(out_dir, name)
         with open(out, "w") as fh:
             fh.write(html)
         print("Wrote %s  (precursor m/z %d, threshold %.1f, %d pts, %.1f KB)"
@@ -223,6 +227,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <script>
 const RAW_MZ=__MZ__;
 const RAW_IT=__IT__;
+const CSV_NAME=__CSVNAME__;
 
 // ---------- build uniform per-segment grid (once) ----------
 function median(arr){const a=arr.slice().sort((x,z)=>x-z);
@@ -381,7 +386,7 @@ function buildCSV(){
 }
 document.getElementById('dl').addEventListener('click',()=>{
  const blob=new Blob([buildCSV()],{type:'text/csv'}),a=document.createElement('a');
- a.href=URL.createObjectURL(blob);a.download='polyP_LCR_processed.csv';a.click();
+ a.href=URL.createObjectURL(blob);a.download=CSV_NAME;a.click();
 });
 // ---- linked-file live sync (File System Access API, Chromium only) ----
 let csvHandle=null,csvTimer=null;
@@ -395,7 +400,7 @@ if(!window.showSaveFilePicker){
  linkBtn.addEventListener('click',async()=>{
   try{
    csvHandle=await window.showSaveFilePicker({
-     suggestedName:'polyP_LCR_processed.csv',
+     suggestedName:CSV_NAME,
      types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});
    csvStat.textContent='linked: '+csvHandle.name;
    syncCSV();
