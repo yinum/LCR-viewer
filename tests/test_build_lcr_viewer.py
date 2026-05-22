@@ -1,4 +1,4 @@
-import os, sys, unittest, tempfile, datetime
+import os, sys, json, unittest, tempfile, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import build_lcr_viewer as blv
@@ -134,6 +134,45 @@ class TestMainIntegration(unittest.TestCase):
             for n in os.listdir(d):
                 os.unlink(os.path.join(d, n))
             os.rmdir(d)
+
+
+class TestLoadPreset(unittest.TestCase):
+    def test_no_file_returns_builtin_defaults(self):
+        d = tempfile.mkdtemp()
+        self.assertEqual(blv.load_preset(d), blv.PRESET)
+        os.rmdir(d)
+
+    def test_valid_file_overrides(self):
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "preset.json"), "w") as fh:
+            json.dump({"scale": 25, "method": "sg", "window": 51,
+                       "poly": 4, "show_overlay": True}, fh)
+        eff = blv.load_preset(d)
+        self.assertEqual(eff["scale"], 25)
+        self.assertEqual(eff["method"], "sg")
+        self.assertEqual(eff["window"], 51)
+        self.assertEqual(eff["show_overlay"], True)
+        os.unlink(os.path.join(d, "preset.json"))
+        os.rmdir(d)
+
+    def test_partial_keys_merge_over_defaults(self):
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "preset.json"), "w") as fh:
+            json.dump({"window": 777, "bogus": 1}, fh)
+        eff = blv.load_preset(d)
+        self.assertEqual(eff["window"], 777)                  # overridden
+        self.assertEqual(eff["scale"], blv.PRESET["scale"])   # default kept
+        self.assertNotIn("bogus", eff)                        # unknown ignored
+        os.unlink(os.path.join(d, "preset.json"))
+        os.rmdir(d)
+
+    def test_malformed_json_returns_defaults(self):
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "preset.json"), "w") as fh:
+            fh.write("{not valid json")
+        self.assertEqual(blv.load_preset(d), blv.PRESET)
+        os.unlink(os.path.join(d, "preset.json"))
+        os.rmdir(d)
 
 
 if __name__ == "__main__":

@@ -26,8 +26,9 @@ download once from https://cdn.plot.ly/plotly-basic-2.35.2.min.js
 """
 import sys, os, json, datetime
 
-# Tuned processing preset applied as the default for every generated viewer.
-# Editing these values is the supported way to change the saved parameters.
+# Built-in fallback preset. load_preset() overlays preset.json (written by the
+# viewer's Save preset button) on top of these; these values are used whenever
+# no preset.json is present next to the script.
 PRESET = {
     "scale": 10,            # charge-reduced x factor
     "method": "avg",        # smoothing method (adjacent averaging)
@@ -35,6 +36,25 @@ PRESET = {
     "poly": 3,              # SG poly order, retained for the SG control
     "show_overlay": False,  # pre-smoothing overlay checkbox default
 }
+
+def load_preset(here):
+    """Effective preset: the built-in PRESET overlaid with preset.json, if a
+    readable one sits next to the script. preset.json is written by the
+    viewer's Save preset button; only keys also present in PRESET are taken."""
+    eff = dict(PRESET)
+    path = os.path.join(here, "preset.json")
+    if not os.path.exists(path):
+        return eff
+    try:
+        with open(path) as fh:
+            saved = json.load(fh)
+    except (ValueError, OSError) as e:
+        print("preset.json ignored (%s); using built-in defaults" % e)
+        return eff
+    for k in PRESET:
+        if k in saved:
+            eff[k] = saved[k]
+    return eff
 
 def parse_spectrum(path):
     """Read a 2-column m/z, intensity file (whitespace- or comma-delimited).
