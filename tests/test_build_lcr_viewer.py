@@ -87,7 +87,7 @@ class TestBuildHtml(unittest.TestCase):
     NAME = "LCR_mz2092_20260522-0907.html"
 
     def test_preset_values_baked_in(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME)
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
         self.assertIn('id="scale" value="10"', html)
         self.assertIn('id="win" value="299"', html)
         self.assertIn('id="thr" value="123.45"', html)
@@ -100,7 +100,7 @@ class TestBuildHtml(unittest.TestCase):
         self.assertNotIn("__SCALE__", html)
 
     def test_linked_csv_feature_present(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME)
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
         self.assertIn('id="link"', html)          # Link CSV button
         self.assertIn("showSaveFilePicker", html)  # File System Access API
         self.assertIn("buildCSV", html)            # shared CSV helper
@@ -108,6 +108,15 @@ class TestBuildHtml(unittest.TestCase):
         # processed CSV name shares the viewer's stem (LCR_mz..._....csv)
         self.assertIn("LCR_mz2092_20260522-0907.csv", html)
         self.assertNotIn("polyP_LCR_processed.csv", html)
+
+    def test_custom_preset_overrides_controls(self):
+        custom = {"scale": 7, "method": "sg", "window": 15,
+                  "poly": 2, "show_overlay": True}
+        html = blv.build_html(self.MZ, self.IT, 50.0, "/*plotly*/", self.NAME, custom)
+        self.assertIn('id="scale" value="7"', html)
+        self.assertIn('id="win" value="15"', html)
+        self.assertIn('value="sg" selected', html)
+        self.assertIn('id="rawov" checked', html)
 
 
 class TestMainIntegration(unittest.TestCase):

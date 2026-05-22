@@ -136,20 +136,21 @@ def iter_spectrum_files(path):
         return out
     return [path]
 
-def build_html(mz, it, thr, plotly, html_name):
+def build_html(mz, it, thr, plotly, html_name, preset):
     """Assemble a self-contained viewer HTML from spectrum data, the
     per-spectrum threshold, and the inlined Plotly bundle. Control defaults
-    come from PRESET. The processed-CSV download/link reuses html_name's stem
-    so the CSV matches its viewer (LCR_mz<precursor>_<timestamp>.csv)."""
+    come from the effective preset (see load_preset). The processed-CSV
+    download/link reuses html_name's stem so the CSV matches its viewer
+    (LCR_mz<precursor>_<timestamp>.csv)."""
     csv_name = os.path.splitext(os.path.basename(html_name))[0] + ".csv"
     html = TEMPLATE
-    html = html.replace("__SCALE__", str(PRESET["scale"]))
+    html = html.replace("__SCALE__", str(preset["scale"]))
     html = html.replace("__THR__", "%g" % thr)
-    html = html.replace("__WIN__", str(PRESET["window"]))
-    html = html.replace("__POLY__", str(PRESET["poly"]))
-    html = html.replace("__RAWOV__", "checked" if PRESET["show_overlay"] else "")
-    html = html.replace('value="%s"' % PRESET["method"],
-                        'value="%s" selected' % PRESET["method"])
+    html = html.replace("__WIN__", str(preset["window"]))
+    html = html.replace("__POLY__", str(preset["poly"]))
+    html = html.replace("__RAWOV__", "checked" if preset["show_overlay"] else "")
+    html = html.replace('value="%s"' % preset["method"],
+                        'value="%s" selected' % preset["method"])
     html = html.replace("__CSVNAME__", json.dumps(csv_name))
     html = html.replace("__MZ__", json.dumps(mz))
     html = html.replace("__IT__", json.dumps(it))
@@ -166,6 +167,7 @@ def main():
 
     with open(os.path.join(here, "plotly-basic.min.js")) as fh:
         plotly = fh.read()
+    preset = load_preset(here)
 
     files = iter_spectrum_files(src)
     if not files:
@@ -180,7 +182,7 @@ def main():
         thr = auto_threshold(mz, it)
         prec = precursor_mz(mz, it)
         name = output_filename(prec)
-        html = build_html(mz, it, thr, plotly, name)
+        html = build_html(mz, it, thr, plotly, name, preset)
         out = os.path.join(out_dir, name)
         with open(out, "w") as fh:
             fh.write(html)
