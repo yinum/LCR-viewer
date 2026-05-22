@@ -22,6 +22,23 @@ download once from https://cdn.plot.ly/plotly-basic-2.35.2.min.js
 """
 import sys, os, json
 
+def parse_spectrum(path):
+    """Read a 2-column m/z, intensity file (whitespace- or comma-delimited).
+    Returns (mz, it) lists of floats. Raises ValueError if no numeric rows."""
+    mz, it = [], []
+    with open(path) as fh:
+        for line in fh:
+            parts = line.replace(",", " ").split()
+            if len(parts) >= 2:
+                try:
+                    mz.append(float(parts[0]))
+                    it.append(float(parts[1]))
+                except ValueError:
+                    pass
+    if not mz:
+        raise ValueError("No numeric data parsed from " + path)
+    return mz, it
+
 def main():
     src  = sys.argv[1] if len(sys.argv) > 1 else "clipboard_spectrum.txt"
     out  = sys.argv[2] if len(sys.argv) > 2 else "polyP_LCR_viewer.html"
