@@ -25,7 +25,7 @@ per spectrum.
 The Plotly basic bundle (plotly-basic.min.js) must sit next to this script;
 download once from https://cdn.plot.ly/plotly-basic-2.35.2.min.js
 """
-import sys, os, json, datetime
+import sys, os, json, re, datetime
 
 # Built-in fallback preset. load_preset() overlays preset.json (written by the
 # viewer's Save preset button) on top of these; these values are used whenever
@@ -73,6 +73,14 @@ def parse_spectrum(path):
     if not mz:
         raise ValueError("No numeric data parsed from " + path)
     return mz, it
+
+def precursor_from_name(path):
+    """Precursor m/z parsed from a spectrum filename's trailing number
+    (decimals allowed): PF4_polyP_3300.xy -> 3300.0, run_3300.5.xy -> 3300.5.
+    Returns None when the name (minus extension) does not end in a number."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    m = re.search(r"(\d+(?:\.\d+)?)$", stem)
+    return float(m.group(1)) if m else None
 
 def find_segments(mz):
     """Split indices into contiguous peak-group segments at large m/z gaps.

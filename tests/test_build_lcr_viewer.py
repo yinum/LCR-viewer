@@ -190,5 +190,20 @@ class TestLoadPreset(unittest.TestCase):
         os.rmdir(d)
 
 
+class TestPrecursorFromName(unittest.TestCase):
+    def test_integer_trailing_number(self):
+        self.assertEqual(blv.precursor_from_name("PF4_polyP_3300.xy"), 3300.0)
+
+    def test_decimal_trailing_number(self):
+        self.assertEqual(blv.precursor_from_name("run_3300.5.xy"), 3300.5)
+
+    def test_path_is_handled(self):
+        self.assertEqual(blv.precursor_from_name("/data/LCR/PF4_polyP_3700.xy"),
+                         3700.0)
+
+    def test_no_trailing_number_returns_none(self):
+        self.assertIsNone(blv.precursor_from_name("clipboard_spectrum.txt"))
+
+
 if __name__ == "__main__":
     unittest.main()
