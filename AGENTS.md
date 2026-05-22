@@ -38,8 +38,10 @@ script (git-ignored — download once per `README.md`). Tests:
 
 - **Scaling** — charge-reduced region (m/z ≥ threshold) ×factor; parent envelope
   stays ×1. The threshold is auto-placed per spectrum just past the parent
-  envelope (`auto_threshold`); fixed parameters come from `load_preset()` — the
-  built-in `PRESET` dict overlaid with a viewer-saved `preset.json` (git-ignored).
+  envelope (`auto_threshold`): the cluster at the filename precursor m/z
+  (`precursor_from_name`, a trailing number in the name) when present, else the
+  base-peak cluster. Fixed parameters come from `load_preset()` — the built-in
+  `PRESET` dict overlaid with a viewer-saved `preset.json` (git-ignored).
 - **Smoothing** — each peak group is resampled onto a uniform m/z grid, then
   smoothed with zero-baseline padding, so a window of N affects every peak and
   the result equals Origin smoothing the full continuous profile.

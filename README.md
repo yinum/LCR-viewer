@@ -41,9 +41,13 @@ python3 build_lcr_viewer.py INPUT [OUTPUT_DIR]
 - `OUTPUT_DIR` — optional; defaults to `../../outputs/LCR/individual peaks`
   (the workspace `outputs/` data area).
 
-Each viewer is named `LCR_mz<precursor>_<YYYYMMDD-HHMM>.html`, where
-`<precursor>` is the parent-envelope (base-peak) m/z. The timestamp means
-re-runs never overwrite a prior viewer.
+Each viewer is named `LCR_mz<precursor>_<YYYYMMDD-HHMM>.html`. The precursor
+m/z is read from the spectrum filename's trailing number when present
+(`PF4_polyP_3300.xy` → `3300`, decimals allowed); otherwise it is inferred
+from the base peak. A filename precursor also anchors the scaling threshold to
+that m/z's peak cluster — correct even when a charge-reduced product is more
+intense than the precursor. The timestamp means re-runs never overwrite a
+prior viewer.
 
 Processing parameters come from the preset (built-in `PRESET` defaults —
 charge-reduced ×10, adjacent-averaging smoothing, window 299, pre-smoothing
