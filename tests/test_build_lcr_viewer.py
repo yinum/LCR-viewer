@@ -49,21 +49,11 @@ class TestBasePeakAnalysis(unittest.TestCase):
     def test_precursor_mz_is_rounded_base_peak(self):
         self.assertEqual(blv.precursor_mz(self.MZ, self.IT), 100)
 
-    def test_threshold_sits_just_past_parent_edge(self):
+    def test_threshold_is_fixed_margin_past_parent_edge(self):
+        # parent envelope right edge is 100.6; threshold = edge + THRESHOLD_MARGIN,
+        # with no clamping against satellite peaks just above the envelope
         thr = blv.auto_threshold(self.MZ, self.IT)
-        # parent segment right edge is 100.6; threshold lands in the valley
-        # before the next cluster at 150.0
-        self.assertGreater(thr, 100.6)
-        self.assertLess(thr, 150.0)
-
-    def test_threshold_margin_clamped_to_half_gap(self):
-        # fine 0.01 spacing -> gap threshold floors at 1.0, so a 1.5 m/z gap
-        # splits the clusters; gap/2 (0.75) is below THRESHOLD_MARGIN (2.0),
-        # so the margin is clamped to 0.75
-        mz = [100.00, 100.01, 100.02, 100.03, 101.53, 101.54, 101.55]
-        it = [40.0, 90.0, 50.0, 10.0, 5.0, 6.0, 4.0]
-        thr = blv.auto_threshold(mz, it)
-        self.assertAlmostEqual(thr, 100.78, delta=1e-4)
+        self.assertAlmostEqual(thr, 100.6 + blv.THRESHOLD_MARGIN, delta=1e-6)
 
 
 class TestOutputFilename(unittest.TestCase):

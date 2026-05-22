@@ -73,7 +73,7 @@ def find_segments(mz):
     segs.append((start, n - 1))
     return segs
 
-THRESHOLD_MARGIN = 2.0  # m/z placed just past the parent envelope
+THRESHOLD_MARGIN = 45.0  # m/z placed past the parent envelope edge
 
 def _base_peak_index(it):
     """Index of the most intense point."""
@@ -88,20 +88,15 @@ def precursor_mz(mz, it):
     return int(round(mz[_base_peak_index(it)]))
 
 def auto_threshold(mz, it):
-    """Scaling threshold m/z, placed just past the right edge of the parent
-    envelope (the segment containing the base peak), clamped to stay within
-    the empty valley before the next cluster."""
+    """Scaling threshold m/z, placed a fixed margin (THRESHOLD_MARGIN) past the
+    right edge of the parent envelope -- the segment containing the base peak.
+    The charge-reduced ladder sits well above the precursor, so a fixed offset
+    is safer than clamping to the nearest peak, which is typically a minor
+    satellite just above the envelope rather than a charge-reduced product."""
     bi = _base_peak_index(it)
     segs = find_segments(mz)
     parent = next(s for s in segs if s[0] <= bi <= s[1])
-    right_mz = mz[parent[1]]
-    later = [s for s in segs if s[0] > parent[1]]
-    if later:
-        gap = mz[later[0][0]] - right_mz
-        margin = min(THRESHOLD_MARGIN, gap / 2)
-    else:
-        margin = THRESHOLD_MARGIN
-    return right_mz + margin
+    return mz[parent[1]] + THRESHOLD_MARGIN
 
 def output_filename(precursor, when=None):
     """Per-spectrum viewer filename: LCR_mz<precursor>_<YYYYMMDD-HHMM>.html"""
