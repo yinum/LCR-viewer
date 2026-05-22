@@ -39,6 +39,26 @@ def parse_spectrum(path):
         raise ValueError("No numeric data parsed from " + path)
     return mz, it
 
+def find_segments(mz):
+    """Split indices into contiguous peak-group segments at large m/z gaps.
+    Returns a list of (start, end) inclusive index pairs. Mirrors the
+    gap-detection in the in-HTML buildGrid: median small gap x 60, floored
+    at 1.0 m/z."""
+    n = len(mz)
+    if n == 0:
+        return []
+    small = sorted(mz[i] - mz[i - 1] for i in range(1, n)
+                   if 0 < mz[i] - mz[i - 1] < 0.5)
+    dx0 = small[(len(small) - 1) // 2] if small else 0.02
+    gap_thr = max(1.0, dx0 * 60)
+    segs, start = [], 0
+    for i in range(1, n):
+        if mz[i] - mz[i - 1] > gap_thr:
+            segs.append((start, i - 1))
+            start = i
+    segs.append((start, n - 1))
+    return segs
+
 def main():
     src  = sys.argv[1] if len(sys.argv) > 1 else "clipboard_spectrum.txt"
     out  = sys.argv[2] if len(sys.argv) > 2 else "polyP_LCR_viewer.html"

@@ -25,5 +25,20 @@ class TestParseSpectrum(unittest.TestCase):
         os.unlink(path)
 
 
+class TestFindSegments(unittest.TestCase):
+    def test_two_clusters_split_at_large_gap(self):
+        # cluster A: 100.0..100.6 step 0.2 ; big gap ; cluster B: 150.0..150.4
+        mz = [100.0, 100.2, 100.4, 100.6, 150.0, 150.2, 150.4]
+        segs = blv.find_segments(mz)
+        self.assertEqual(segs, [(0, 3), (4, 6)])
+
+    def test_single_cluster_one_segment(self):
+        mz = [100.0, 100.2, 100.4, 100.6]
+        self.assertEqual(blv.find_segments(mz), [(0, 3)])
+
+    def test_empty_input(self):
+        self.assertEqual(blv.find_segments([]), [])
+
+
 if __name__ == "__main__":
     unittest.main()
