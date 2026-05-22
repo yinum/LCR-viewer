@@ -108,6 +108,13 @@ class TestBuildHtml(unittest.TestCase):
         self.assertNotIn("__MZ__", html)
         self.assertNotIn("__SCALE__", html)
 
+    def test_linked_csv_feature_present(self):
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/")
+        self.assertIn('id="link"', html)          # Link CSV button
+        self.assertIn("showSaveFilePicker", html)  # File System Access API
+        self.assertIn("buildCSV", html)            # shared CSV helper
+        self.assertIn('id="dl"', html)             # download fallback kept
+
 
 if __name__ == "__main__":
     unittest.main()

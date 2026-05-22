@@ -209,6 +209,8 @@ TEMPLATE = r"""<!DOCTYPE html>
    <label><input type="checkbox" id="rawov" __RAWOV__> pre-smoothing overlay</label>
    <label><input type="checkbox" id="logy"> log Y axis</label></div>
  <div class="ctl"><button id="dl">Download processed CSV</button></div>
+ <div class="ctl"><button id="link">Link CSV file (live)</button>
+   <span id="csvstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
 </div>
 <div class="hint">
  Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope ~m/z 2092 stays x1;
@@ -365,18 +367,53 @@ function recompute(){
    toImageButtonOptions:{format:'png',scale:3,filename:'polyP_LCR_spectrum'}});
  document.getElementById('status').textContent=
    G.nseg+' peak segments, '+G.gmz.length+' grid points.';
+ syncCSV();
 }
 ['scale','thr','method','win','poly','logy','rawov'].forEach(id=>{
  const el=document.getElementById(id);
  el.addEventListener('input',recompute);
  el.addEventListener('change',recompute);
 });
-document.getElementById('dl').addEventListener('click',()=>{
+function buildCSV(){
  let csv='m/z,intensity_processed\n';
  for(let i=0;i<PROC_X.length;i++)csv+=PROC_X[i]+','+PROC_Y[i]+'\n';
- const blob=new Blob([csv],{type:'text/csv'}),a=document.createElement('a');
+ return csv;
+}
+document.getElementById('dl').addEventListener('click',()=>{
+ const blob=new Blob([buildCSV()],{type:'text/csv'}),a=document.createElement('a');
  a.href=URL.createObjectURL(blob);a.download='polyP_LCR_processed.csv';a.click();
 });
+// ---- linked-file live sync (File System Access API, Chromium only) ----
+let csvHandle=null,csvTimer=null;
+const linkBtn=document.getElementById('link');
+const csvStat=document.getElementById('csvstat');
+if(!window.showSaveFilePicker){
+ linkBtn.disabled=true;
+ linkBtn.title='Live link needs Chrome or Edge; use Download instead.';
+ csvStat.textContent='live link not supported in this browser';
+}else{
+ linkBtn.addEventListener('click',async()=>{
+  try{
+   csvHandle=await window.showSaveFilePicker({
+     suggestedName:'polyP_LCR_processed.csv',
+     types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});
+   csvStat.textContent='linked: '+csvHandle.name;
+   syncCSV();
+  }catch(e){/* user cancelled the picker */}
+ });
+}
+function syncCSV(){
+ if(!csvHandle)return;
+ clearTimeout(csvTimer);
+ csvTimer=setTimeout(async()=>{
+  try{
+   const w=await csvHandle.createWritable();
+   await w.write(buildCSV());
+   await w.close();
+   csvStat.textContent='synced: '+csvHandle.name;
+  }catch(e){csvStat.textContent='write failed: '+e.message;}
+ },200);
+}
 recompute();
 </script>
 </body>
