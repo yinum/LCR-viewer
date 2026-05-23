@@ -196,11 +196,43 @@ const LadderLabeler = (function () {
     L.sigmaM = C._stdDev(implied);
   }
 
+  function addLadderFromTwoClicks(m1, m2, specX, specY) {
+    const sol = C.solveFromTwoClicks(m1, m2);
+    if (sol === null) {
+      return { error: 'ambiguous two-click — pick farther-apart rungs' };
+    }
+    const mLo = Math.min(m1, m2);  // higher-charge click is the seed anchor
+    return addLadderFromSeed({ mz: mLo, z: sol.z }, specX, specY);
+  }
+
+  function removeLadder(id) {
+    const idx = state.ladders.findIndex(L => L.id === id);
+    if (idx < 0) return;
+    state.ladders.splice(idx, 1);
+    if (state.activeLadderId === id) {
+      state.activeLadderId = state.ladders.length ? state.ladders[0].id : null;
+    }
+  }
+
+  function setActive(id) {
+    if (state.ladders.some(L => L.id === id)) {
+      state.activeLadderId = id;
+    }
+  }
+
+  function refreshAll(specX, specY) {
+    for (const L of state.ladders) refreshLadder(L.id, specX, specY);
+  }
+
   return {
     state,
     _resetIdCounter,
     _candidateRungs,
     addLadderFromSeed,
+    addLadderFromTwoClicks,
+    removeLadder,
+    setActive,
     refreshLadder,
+    refreshAll,
   };
 })();

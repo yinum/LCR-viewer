@@ -256,6 +256,89 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('refreshLadder dedup: manual at z=5 prevents auto duplicate',
           z5entries.length === 1 && z5entries[0].manual === true,
           'got ' + z5entries.length + ' entries at z=5');
+
+    // ---------- Task 7 tests: multi-ladder ops ----------
+    resetLabelerState();
+    const spec2 = makeLadderSpectrum();
+
+    // add a second synthetic ladder at higher M
+    function addSecondLadderPeaks(X, Y) {
+      // M₂ ≈ 52784 Da, z₀=16, parent at m/z = (52784 + 16*m_H)/16 ≈ 3300
+      // To keep this test distinguishable, place ladder B parent at m/z = 3302.5
+      // and add peaks at predicted rungs.
+      const M2 = 16 * 3302.5 - 16 * LadderLabelerCore.M_H;
+      const peaks = [];
+      for (let z = 15; z >= 1; z--) {
+        const p = LadderLabelerCore.predictRung(M2, z);
+        if (p >= 3000 && p <= 14000) peaks.push(p);
+      }
+      for (let i = 0; i < X.length; i++) {
+        for (const p of peaks) {
+          Y[i] += Math.exp(-Math.pow((X[i] - p) / 2.0, 2));
+        }
+      }
+    }
+    addSecondLadderPeaks(spec2.X, spec2.Y);
+
+    const rA = LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, spec2.X, spec2.Y);
+    const rB = LadderLabeler.addLadderFromSeed({ mz: 3302.5, z: 16 }, spec2.X, spec2.Y);
+
+    check('second ladder gets id B', rB.id === 'B');
+
+    check('two ladders both present in state',
+          LadderLabeler.state.ladders.length === 2);
+
+    check('ladders have distinct colors',
+          LadderLabeler.state.ladders[0].color !== LadderLabeler.state.ladders[1].color);
+
+    check('new ladder becomes active',
+          LadderLabeler.state.activeLadderId === 'B');
+
+    LadderLabeler.setActive('A');
+    check('setActive switches the active ladder',
+          LadderLabeler.state.activeLadderId === 'A');
+
+    LadderLabeler.setActive('Z');  // nonexistent
+    check('setActive with unknown id is a no-op',
+          LadderLabeler.state.activeLadderId === 'A');
+
+    LadderLabeler.removeLadder('A');
+    check('removeLadder removes A',
+          LadderLabeler.state.ladders.length === 1
+          && LadderLabeler.state.ladders[0].id === 'B');
+
+    check('removing the active ladder shifts active to the remaining ladder',
+          LadderLabeler.state.activeLadderId === 'B');
+
+    LadderLabeler.removeLadder('B');
+    check('removing the last ladder leaves activeLadderId null',
+          LadderLabeler.state.activeLadderId === null
+          && LadderLabeler.state.ladders.length === 0);
+
+    // addLadderFromTwoClicks
+    resetLabelerState();
+    const rTC = LadderLabeler.addLadderFromTwoClicks(3300, 3771, spec2.X, spec2.Y);
+    check('addLadderFromTwoClicks succeeds with adjacent clicks',
+          rTC.id !== undefined,
+          JSON.stringify(rTC));
+
+    check('two-click-seeded ladder has z₀ = 8',
+          LadderLabeler.state.ladders[0].seed.z === 8);
+
+    check('two-click ambiguous returns error, no ladder created',
+          LadderLabeler.addLadderFromTwoClicks(3300, 3300.5, spec2.X, spec2.Y).error !== undefined
+          && LadderLabeler.state.ladders.length === 1);
+
+    // refreshAll re-snaps every ladder
+    resetLabelerState();
+    LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, spec2.X, spec2.Y);
+    LadderLabeler.addLadderFromSeed({ mz: 3302.5, z: 16 }, spec2.X, spec2.Y);
+    const sigBefore = LadderLabeler.state.ladders[0].sigmaM;
+    LadderLabeler.refreshAll(spec2.X, spec2.Y);
+    const sigAfter = LadderLabeler.state.ladders[0].sigmaM;
+    check('refreshAll preserves sigmaM (idempotent on unchanged spectrum)',
+          near(sigBefore, sigAfter, 1e-9),
+          'before=' + sigBefore + ' after=' + sigAfter);
   } catch (err) {
     const div = document.createElement('pre');
     div.className = 'fail-line';
