@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LadderLabeler tests</title>
+<style>
+ body{font-family:-apple-system,Segoe UI,Arial,sans-serif;margin:20px;color:#222}
+ #summary{font-size:18px;font-weight:600;padding:8px;border-radius:4px;margin-bottom:14px}
+ .pass{background:#d4f8d4;color:#1a6f1a}
+ .fail{background:#f8d4d4;color:#8a1a1a}
+ pre{background:#f4f4f4;padding:6px 10px;border-left:3px solid #888;margin:4px 0;white-space:pre-wrap;font-size:12px}
+ .pass-line{color:#1a6f1a}
+ .fail-line{color:#8a1a1a;font-weight:600}
+</style>
+</head>
+<body>
+<h2>LadderLabeler — pure-function tests</h2>
+<p>Open this file directly in a browser (file:// works). The page loads
+<code>../ladder_labeler.js</code> and runs the test cases below.</p>
+<div id="summary">running…</div>
+<div id="log"></div>
+
+<script src="../ladder_labeler.js"></script>
+<script>
+const log = document.getElementById('log');
+const summary = document.getElementById('summary');
+let passed = 0, failed = 0;
+
+function near(a, b, tol) { return Math.abs(a - b) <= tol; }
+
+function check(name, condition, detail) {
+  const div = document.createElement('pre');
+  if (condition) {
+    div.className = 'pass-line';
+    div.textContent = '✓ ' + name;
+    passed++;
+  } else {
+    div.className = 'fail-line';
+    div.textContent = '✗ ' + name + (detail ? '  — ' + detail : '');
+    failed++;
+  }
+  log.appendChild(div);
+}
+
+// ---------- Task 2 tests: M_H, computeM, predictRung ----------
+check('M_H is the proton mass to 9 sig figs',
+      near(LadderLabelerCore.M_H, 1.00727646677, 1e-10),
+      'got ' + LadderLabelerCore.M_H);
+
+check('computeM(8, 3300) ≈ 26391.94 Da',
+      near(LadderLabelerCore.computeM(8, 3300), 26391.94, 0.1),
+      'got ' + LadderLabelerCore.computeM(8, 3300));
+
+check('predictRung(26391.94, 7) ≈ 3771.28',
+      near(LadderLabelerCore.predictRung(26391.94, 7), 3771.28, 0.05),
+      'got ' + LadderLabelerCore.predictRung(26391.94, 7));
+
+check('round-trip: predictRung(computeM(z, mz), z) === mz',
+      near(LadderLabelerCore.predictRung(LadderLabelerCore.computeM(8, 3300), 8), 3300, 1e-9));
+
+// ---------- summary ----------
+summary.className = failed === 0 ? 'pass' : 'fail';
+summary.textContent = passed + ' passed, ' + failed + ' failed.';
+</script>
+</body>
+</html>
