@@ -104,3 +104,100 @@ const LadderLabelerCore = (function () {
   return { M_H, computeM, predictRung, solveFromTwoClicks,
            snapToMaxInWindow, _stdDev, formatMass, formatSigma };
 })();
+
+// ============================================================================
+// LadderLabeler — stateful, multi-ladder manager that consumes LadderLabelerCore.
+// Spec §3.1, §3.2, §4.1, §4.5.
+// ============================================================================
+
+const LadderLabeler = (function () {
+  const C = LadderLabelerCore;
+  const COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
+                  '#9467bd', '#8c564b', '#e377c2', '#7f7f7f'];
+
+  const state = {
+    enabled: false,
+    tolMz: 5.0,
+    sigmaAmberRelative: 0.01,
+    ladders: [],
+    activeLadderId: null,
+    pendingMode: null,        // null | 'two-click'
+    twoClickBuffer: null,
+  };
+
+  let _nextIdIndex = 0;
+  function _nextId() {
+    const letter = String.fromCharCode(65 + (_nextIdIndex % 26));
+    _nextIdIndex++;
+    return letter;
+  }
+  function _nextColor() {
+    return COLORS[(_nextIdIndex - 1) % COLORS.length];
+  }
+  function _resetIdCounter() { _nextIdIndex = 0; }
+
+  // z' = z₀-1, z₀-2, …, 1. Seed itself is NOT in this list (spec §3.2).
+  function _candidateRungs(z0) {
+    const out = [];
+    for (let z = z0 - 1; z >= 1; z--) out.push(z);
+    return out;
+  }
+
+  function addLadderFromSeed(opts, specX, specY) {
+    const { mz, z } = opts;
+    if (!Number.isInteger(z) || z < 2) {
+      return { error: 'z₀ must be an integer ≥ 2' };
+    }
+    const ladder = {
+      id: _nextId(),
+      color: _nextColor(),
+      seed: { mz, z },
+      M: C.computeM(z, mz),
+      sigmaM: 0,
+      labels: [],
+    };
+    state.ladders.push(ladder);
+    state.activeLadderId = ladder.id;
+    refreshLadder(ladder.id, specX, specY);
+    return { id: ladder.id };
+  }
+
+  function refreshLadder(id, specX, specY) {
+    const L = state.ladders.find(x => x.id === id);
+    if (!L) return;
+    L.M = C.computeM(L.seed.z, L.seed.mz);
+    // Preserve manual overrides across re-snapping. Auto labels are rebuilt.
+    const manualPreserved = L.labels.filter(lb => lb.manual);
+    L.labels = [];
+    for (const z of _candidateRungs(L.seed.z)) {
+      const mzPred = C.predictRung(L.M, z);
+      const mzObs = C.snapToMaxInWindow(mzPred, specX, specY, state.tolMz);
+      const mImplied = (mzObs === null) ? null : C.computeM(z, mzObs);
+      L.labels.push({ z, mzPred, mzObs, mImplied, manual: false, stale: false });
+    }
+    // Re-snap each manual label near its previous mzObs; mark stale if not found.
+    for (const m of manualPreserved) {
+      const newMz = C.snapToMaxInWindow(m.mzObs, specX, specY, state.tolMz);
+      if (newMz !== null) {
+        m.mzObs = newMz;
+        m.mImplied = C.computeM(m.z, newMz);
+        m.stale = false;
+      } else {
+        m.stale = true;
+      }
+      L.labels.push(m);
+    }
+    const implied = L.labels
+      .filter(lb => lb.mImplied !== null && !lb.manual)
+      .map(lb => lb.mImplied);
+    L.sigmaM = C._stdDev(implied);
+  }
+
+  return {
+    state,
+    _resetIdCounter,
+    _candidateRungs,
+    addLadderFromSeed,
+    refreshLadder,
+  };
+})();

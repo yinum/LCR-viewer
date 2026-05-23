@@ -169,6 +169,76 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('formatSigma at very small rel uses absolute units',
           FS(26000, 5).indexOf('Da') >= 0 || FS(26000, 5).indexOf('kDa') >= 0,
           'got ' + FS(26000, 5));
+
+    // ---------- Task 6 tests: state + addLadderFromSeed + refreshLadder ----------
+    // Synthetic ladder: parent M = 26391.94, z₀=8, m/z=3300. Predicted rungs:
+    //   z=7: 3771.28, z=6: 4399.66, z=5: 5279.40, z=4: 6598.99, z=3: 8797.99,
+    //   z=2: 13197.0, z=1: 26392.95 (outside our 3000–14000 range below)
+    // Build a spectrum with broad gaussian "peaks" at those m/z's.
+    function makeLadderSpectrum() {
+      const X = [], Y = [];
+      const peaks = [3300, 3771.2, 4399.5, 5279.6, 6599.2, 8797.8, 13197.3];
+      for (let mz = 3000; mz <= 14000; mz += 0.5) {
+        X.push(mz);
+        let y = 0;
+        for (const p of peaks) y += Math.exp(-Math.pow((mz - p) / 2.0, 2));
+        Y.push(y);
+      }
+      return { X, Y };
+    }
+
+    // Reset module state before each test (rebuilt fresh by reloading the page;
+    // but the test page only loads once, so call resetLabelerState() between
+    // sub-tests).
+    function resetLabelerState() {
+      LadderLabeler.state.ladders = [];
+      LadderLabeler.state.activeLadderId = null;
+      LadderLabeler.state.enabled = false;
+      LadderLabeler._resetIdCounter();
+    }
+
+    resetLabelerState();
+    const spec = makeLadderSpectrum();
+
+    const r1 = LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, spec.X, spec.Y);
+    check('addLadderFromSeed assigns id A to first ladder',
+          r1.id === 'A',
+          JSON.stringify(r1));
+
+    const L = LadderLabeler.state.ladders[0];
+    check('ladder.color is a hex string',
+          typeof L.color === 'string' && L.color.startsWith('#'),
+          L.color);
+
+    check('ladder.M ≈ 26391.94',
+          near(L.M, 26391.94, 0.1),
+          'M = ' + L.M);
+
+    check('ladder has 7 candidate labels (z = 7..1)',
+          L.labels.length === 7,
+          'got ' + L.labels.length);
+
+    const found = L.labels.filter(lb => lb.mzObs !== null);
+    check('at least 6 of 7 candidates were snapped to peaks',
+          found.length >= 6,
+          'got ' + found.length);
+
+    check('z=1 rung at predicted ≈26393 is null (outside synthetic spectrum range)',
+          L.labels.find(lb => lb.z === 1).mzObs === null);
+
+    check('every found rung\'s mImplied is within ±20 Da of L.M',
+          found.every(lb => Math.abs(lb.mImplied - L.M) < 20),
+          JSON.stringify(found.map(lb => ({z: lb.z, mImplied: Math.round(lb.mImplied*10)/10}))));
+
+    check('addLadderFromSeed rejects z₀ = 1 with an error',
+          LadderLabeler.addLadderFromSeed({ mz: 3300, z: 1 }, spec.X, spec.Y).error !== undefined);
+
+    check('addLadderFromSeed rejects non-integer z₀',
+          LadderLabeler.addLadderFromSeed({ mz: 3300, z: 7.5 }, spec.X, spec.Y).error !== undefined);
+
+    // active ladder is the most recently added valid one
+    check('first valid ladder becomes the active ladder',
+          LadderLabeler.state.activeLadderId === 'A');
   } catch (err) {
     const div = document.createElement('pre');
     div.className = 'fail-line';
