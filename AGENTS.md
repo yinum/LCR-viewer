@@ -79,5 +79,17 @@ viewers are unaffected. `plotly-basic.min.js` must sit next to the script
   (pick an existing file); Update sibling and Download use
   `showSaveFilePicker`. Keep all three on the shared id, or the
   "dialog opens in the sibling folder" UX breaks.
+- **Ladder labels** (opt-in, default off) — a self-contained JS module
+  (`ladder_labeler.js`, inlined into the HTML at build time the same way
+  Plotly is) annotates LCR charge-reduction ladders. Per ladder: typed
+  `z₀` + precursor m/z OR closed-form solve from two clicked rungs;
+  predicts m/z(z) = (M + z·m_H)/z for z = z₀−1 → 1; snaps each rung to
+  the global max within ±`tol_mz` of the prediction. Multiple ladders
+  per spectrum (distinct colors). Manual override per peak via
+  click-prompt: integer → override z, `Ns` → re-seed, empty → delete.
+  Default off in `preset.json`; full MS1 workflow is bit-identical when
+  the labeler is disabled. Pure-math tests in
+  `tests/ladder_labeler_test.html` (open in a browser). Spec:
+  `docs/superpowers/specs/2026-05-22-ladder-labeling-design.md`.
 
 See code comments in `build_lcr_viewer.py` for detail.
