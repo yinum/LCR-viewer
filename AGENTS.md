@@ -42,7 +42,7 @@ viewers are unaffected. `plotly-basic.min.js` must sit next to the script
 - Commit **code only**. Spectra (`*.txt`, `*.csv`, `*.xy`), generated viewers
   (`*.html`), a viewer-saved `preset.json`, and the vendored
   `plotly-basic.min.js` are git-ignored — keep it that way.
-- Remote: `github.com/yinum/LCR-viewer` (private). Push when the user asks.
+- Remote: `github.com/yinum/LCR-viewer` (public). Push when the user asks.
 - The generated HTML must stay fully self-contained (Plotly inlined) and work
   offline — no data leaves the machine.
 
