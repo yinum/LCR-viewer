@@ -911,6 +911,16 @@ function recompute(){
    annotations:scaleOn?[{x:thr,yref:'paper',y:1.04,text:'x'+factor+' above',
                  showarrow:false,font:{size:10,color:'#cc4400'}}]:[]
  };
+ // Merge ladder-label shapes/annotations from the LadderLabeler module
+ // (spec §5.2, §5.4). When disabled, this returns empty arrays so the
+ // existing MS1 layout is bit-identical to before.
+ if (typeof LadderLabeler !== 'undefined') {
+   LadderLabeler.refreshAll(PROC_X, PROC_Y);
+   const g = LadderLabeler.buildAnnotations(PROC_X, PROC_Y);
+   layout.shapes = (layout.shapes || []).concat(g.shapes);
+   layout.annotations = (layout.annotations || []).concat(g.annotations);
+   if (typeof renderLadderPanel === 'function') renderLadderPanel();
+ }
  Plotly.react('plot',traces,layout,{responsive:true,
    toImageButtonOptions:{format:'png',scale:3,filename:'polyP_LCR_spectrum'}});
  document.getElementById('status').textContent=
