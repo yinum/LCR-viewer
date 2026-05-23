@@ -257,27 +257,10 @@ const LadderLabeler = (function () {
         line: { color: L.color, width: 1, dash: 'dash' },
       });
 
-      // 2. Header summary line (spec §5.4) — stacked inside the plot at top-left.
-      // Placed in-plot (paper y just under 1.0) rather than above the plot, so
-      // the M readout stays visible inside the layout's small top margin.
-      const foundCount = L.labels.filter(lb => lb.mzObs !== null).length;
-      const amber = L.M > 0 && (L.sigmaM / L.M) > state.sigmaAmberRelative;
-      const hdrColor = amber ? '#cc4400' : L.color;
-      const hdrText = 'Ladder ' + L.id + ':  M = ' + C.formatMass(L.M, L.sigmaM)
-                    + '  ' + C.formatSigma(L.M, L.sigmaM)
-                    + '  (z₀ = ' + L.seed.z + '+, ' + foundCount + ' rungs)'
-                    + (amber ? '  — check assignments' : '');
-      annots.push({
-        text: hdrText,
-        xref: 'paper', yref: 'paper',
-        x: 0.01, y: 0.98 - 0.05 * ladderIdx,
-        xanchor: 'left', yanchor: 'top', showarrow: false,
-        font: { size: 11, color: hdrColor },
-        bgcolor: 'rgba(255,255,255,0.85)',
-        bordercolor: hdrColor, borderwidth: 1, borderpad: 3,
-      });
-
-      // 3. Per-rung annotations (spec §5.2, §5.3 hover).
+      // 2. Per-rung annotations (spec §5.2, §5.3 hover).
+      // The neutral-mass M summary (spec §5.4) is rendered in the side-panel
+      // ladder row by renderLadderPanel() in build_lcr_viewer.py — keeping the
+      // plot clear of the box that previously overlaid low-m/z peaks.
       const yshift = -40 * ladderIdx;
       for (const lb of L.labels) {
         if (lb.mzObs === null) continue;

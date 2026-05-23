@@ -1153,8 +1153,16 @@ function renderLadderPanel() {
     const active = L.id === st.activeLadderId;
     const foundCount = L.labels.filter(lb => lb.mzObs !== null).length;
     const totalCount = L.labels.length;
-    html += '<div style="display:flex;align-items:center;gap:6px;'
-          + 'padding:2px 0;border-bottom:1px solid #eee">'
+    // M readout for this ladder — spec §5.4. Lives in the side panel rather
+    // than as an in-plot annotation so it never overlays low-m/z peaks.
+    const amber = L.M > 0
+                  && (L.sigmaM / L.M) > LadderLabeler.state.sigmaAmberRelative;
+    const mColor = amber ? '#cc4400' : L.color;
+    const mTxt = 'M = ' + LadderLabelerCore.formatMass(L.M, L.sigmaM)
+               + '  ' + LadderLabelerCore.formatSigma(L.M, L.sigmaM)
+               + (amber ? '  — check assignments' : '');
+    html += '<div style="border-bottom:1px solid #eee;padding:2px 0">'
+          + '<div style="display:flex;align-items:center;gap:6px">'
           + '<input type="radio" name="ladder-active" data-id="' + L.id + '"'
           + (active ? ' checked' : '') + '>'
           + '<span style="display:inline-block;width:10px;height:10px;'
@@ -1170,6 +1178,9 @@ function renderLadderPanel() {
           + foundCount + '/' + totalCount + ' rungs</span>'
           + ' <button data-id="' + L.id + '" data-action="remove" '
           + 'style="margin-left:auto;padding:1px 6px;font-size:11px">✕</button>'
+          + '</div>'
+          + '<div style="padding:1px 0 2px 22px;font-size:11px;color:'
+          + mColor + '">' + mTxt + '</div>'
           + '</div>';
   }
   list.innerHTML = html;
