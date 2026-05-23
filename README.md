@@ -47,8 +47,10 @@ python3 build_lcr_viewer.py [--serve] INPUT [OUTPUT_DIR]
   and its viewers land in `output/LCR/PF4_polyP/`; `results/LCR/polyP/` →
   `output/LCR/polyP/`. The whole `output/` tree is git-ignored.
 - `--serve` — after building, also serve the viewer(s) on a localhost address
-  and open the browser, so the viewer's **Save preset** button writes
-  `preset.json` directly (see [Saving a preset](#saving-a-preset)).
+  and open the browser, so **Save preset** writes `preset.json` directly and
+  **Update sibling CSV** overwrites the build-time sibling without a dialog
+  (see [Saving a preset](#saving-a-preset) and
+  [Updating the sibling CSV in place](#updating-the-sibling-csv-in-place)).
 
 Each run writes two files per spectrum into `OUTPUT_DIR`: the viewer
 `LCR_mz<precursor>_<YYYYMMDD-HHMM>.html` and a sibling processed CSV with the
@@ -78,9 +80,24 @@ same stem (`LCR_mz3300_….html` → `LCR_mz3300_….csv`). It holds the
 with the **preset** parameters — the build computes it directly, no browser
 needed, and it matches the viewer's export at its starting settings exactly.
 The viewer's header shows a **Sibling CSV file** hyperlink to it. The CSV is a
-fixed snapshot: if you edit the controls in the viewer it does not change —
-re-run the build to refresh it, or use the live options below for the current
-on-screen settings.
+fixed snapshot: if you edit the controls in the viewer it does not change
+automatically — refresh it with the **Update sibling CSV** button (below),
+re-run the build, or use the other live options for the current on-screen
+settings.
+
+### Updating the sibling CSV in place
+
+The viewer has an **Update sibling CSV** button that overwrites the build-time
+sibling with the current on-screen settings:
+
+- **Served** (`build_lcr_viewer.py --serve …`) — one click writes the sibling
+  in `OUTPUT_DIR` directly, no dialog. The status line confirms *"updated
+  LCR_mz…csv"*.
+- **Opened as a file** in Chrome or Edge — first click opens a save dialog
+  pre-suggesting the sibling's name; the handle is cached so subsequent clicks
+  overwrite silently.
+- **Other browsers** — disabled (no File System Access API); use **Download
+  processed CSV** instead and move the file into place, or run with `--serve`.
 
 ### Live-synced CSV
 

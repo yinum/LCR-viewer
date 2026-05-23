@@ -32,7 +32,9 @@ run writes two files per spectrum:
 stem (a preset-parameter snapshot the viewer's header hyperlink points at).
 `--serve` additionally serves the built viewers and their CSVs on `127.0.0.1`
 (stdlib `http.server`, auto port) so the viewer's **Save preset** POSTs
-`preset.json` next to the script directly; plain runs and standalone `file://`
+`preset.json` next to the script and **Update sibling CSV** POSTs the current
+on-screen CSV back over the build-time sibling in `out_dir` (validated against
+`csv_written` to block path traversal). Plain runs and standalone `file://`
 viewers are unaffected. `plotly-basic.min.js` must sit next to the script
 (git-ignored — download once per `README.md`). Tests:
 `python3 -m unittest discover -s tests -v`.
