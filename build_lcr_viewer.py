@@ -44,12 +44,21 @@ PRESET = {
     "width_mz": 0.04,       # smoothing width in m/z
     "poly": 3,              # SG poly order, retained for the SG control
     "show_overlay": False,  # pre-smoothing overlay checkbox default
+    # Ladder-labeling block — opt-in module documented in
+    # docs/superpowers/specs/2026-05-22-ladder-labeling-design.md
+    "ladder_labels": {
+        "enabled": False,           # module default off; turn on via panel checkbox
+        "tol_mz": 5.0,              # snap window half-width (m/z); native-MS broad peaks
+        "sigma_amber_relative": 0.01,  # amber if sigma_M / M > this
+    },
 }
 
 def load_preset(here):
     """Effective preset: the built-in PRESET overlaid with preset.json, if a
     readable one sits next to the script. preset.json is written by the
-    viewer's Save preset button; only keys also present in PRESET are taken."""
+    viewer's Save preset button; only keys also present in PRESET are taken.
+    The 'ladder_labels' value is a nested dict; we merge it key-by-key so a
+    partial saved block does not drop the other defaults."""
     eff = dict(PRESET)
     path = os.path.join(here, "preset.json")
     if not os.path.exists(path):
@@ -61,7 +70,15 @@ def load_preset(here):
         print("preset.json ignored (%s); using built-in defaults" % e)
         return eff
     for k in PRESET:
-        if k in saved:
+        if k not in saved:
+            continue
+        if isinstance(PRESET[k], dict) and isinstance(saved[k], dict):
+            merged = dict(PRESET[k])
+            for ik in PRESET[k]:
+                if ik in saved[k]:
+                    merged[ik] = saved[k][ik]
+            eff[k] = merged
+        else:
             eff[k] = saved[k]
     return eff
 

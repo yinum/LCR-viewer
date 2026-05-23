@@ -19,3 +19,6 @@ __pycache__/
 
 # local tuned preset written by the viewer's Save preset button
 preset.json
+
+# Test pages (allow the labeler test page; *.html is otherwise ignored)
+!tests/*.html
