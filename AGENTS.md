@@ -51,7 +51,10 @@ viewers are unaffected. `plotly-basic.min.js` must sit next to the script
 ## How it works
 
 - **Scaling** — charge-reduced region (m/z ≥ threshold) ×factor; parent envelope
-  stays ×1. The threshold is auto-placed per spectrum just past the parent
+  stays ×1. Gated by the `scale_on` preset / **"Scale charge-reduced region"**
+  checkbox (default on): when off, no point is multiplied and the threshold
+  marker + "×N above" annotation are hidden — that's the plain MS1 smoothing
+  mode. The threshold is auto-placed per spectrum just past the parent
   envelope (`auto_threshold`): the cluster at the filename precursor m/z
   (`precursor_from_name`, a trailing number in the name) when present, else the
   base-peak cluster. Fixed parameters come from `load_preset()` — the built-in
@@ -66,5 +69,15 @@ viewers are unaffected. `plotly-basic.min.js` must sit next to the script
   (`process_spectrum` / `build_csv`, a faithful mirror of the in-HTML JS) to
   write the preset-snapshot CSV without a browser. The Python mirror and the
   JS pipeline must stay in lockstep — change one, change the other.
+- **Standalone CSV buttons** (`file://` mode) — Update sibling CSV, Link CSV
+  file, and Download processed CSV all share the picker id
+  `lcr-sibling-csv` so Chrome opens each dialog in the sibling CSV's folder
+  after any one of them has been used. Update-sibling and Link persist their
+  FileSystemFileHandles in IndexedDB (database `lcr-viewer`, store `handles`,
+  keys `sibling:<CSV_NAME>` / `link:<CSV_NAME>`) so reloads re-link silently
+  with only a one-click readwrite re-grant. Link uses `showOpenFilePicker`
+  (pick an existing file); Update sibling and Download use
+  `showSaveFilePicker`. Keep all three on the shared id, or the
+  "dialog opens in the sibling folder" UX breaks.
 
 See code comments in `build_lcr_viewer.py` for detail.

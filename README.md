@@ -7,7 +7,9 @@ whole folder of spectra in one run.
 The viewer lets you:
 
 1. **Scale** the charge-reduced region (`m/z >= threshold`) by a factor (preset 10x),
-   leaving the parent envelope at 1x.
+   leaving the parent envelope at 1x. Optional — turn it off with the
+   **"Scale charge-reduced region"** checkbox to smooth a plain MS1 spectrum
+   with no scaling.
 2. **Smooth** the spectrum with an Origin-style method dropdown
    (Savitzky-Golay, adjacent averaging, Gaussian, binomial, median/percentile).
    Each peak group is linearly interpolated onto a fine uniform m/z grid (so
@@ -63,11 +65,13 @@ intense than the precursor. The timestamp means re-runs never overwrite a
 prior viewer.
 
 Processing parameters come from the preset (built-in `PRESET` defaults —
-charge-reduced ×10, adjacent-averaging smoothing, width 0.04 m/z, pre-smoothing
-overlay hidden — overlaid by a viewer-saved `preset.json` if present; see
-[Saving a preset](#saving-a-preset)). The "scale applies above m/z" threshold
-is auto-placed per spectrum, just past the parent envelope. All values stay
-live-editable in the viewer; the preset only sets the starting point.
+charge-reduced scaling on (×10), adjacent-averaging smoothing, width 0.04 m/z,
+pre-smoothing overlay hidden — overlaid by a viewer-saved `preset.json` if
+present; see [Saving a preset](#saving-a-preset)). The "scale applies above
+m/z" threshold is auto-placed per spectrum, just past the parent envelope.
+Setting `scale_on: false` in `preset.json` makes plain MS1 smoothing the
+default for every later build. All values stay live-editable in the viewer;
+the preset only sets the starting point.
 
 The generated HTML is fully self-contained (Plotly inlined) and works offline —
 no data leaves the machine.
@@ -94,17 +98,27 @@ sibling with the current on-screen settings:
   in `OUTPUT_DIR` directly, no dialog. The status line confirms *"updated
   LCR_mz…csv"*.
 - **Opened as a file** in Chrome or Edge — first click opens a save dialog
-  pre-suggesting the sibling's name; the handle is cached so subsequent clicks
-  overwrite silently.
+  pre-suggesting the sibling's name (in the sibling CSV's own folder, via
+  the shared `lcr-sibling-csv` picker id). The handle is persisted to
+  IndexedDB, so subsequent clicks overwrite silently *and reloads re-link the
+  same file* — at most a one-click readwrite re-grant after a reload, never
+  another save dialog.
 - **Other browsers** — disabled (no File System Access API); use **Download
   processed CSV** instead and move the file into place, or run with `--serve`.
 
 ### Live-synced CSV
 
-The viewer has a **Link CSV file** button: in Chrome or Edge, pick a `.csv`
-once and it is rewritten automatically on every parameter change. Other
-browsers fall back to the **Download processed CSV** button, which regenerates
-the CSV from current parameters on each click.
+The viewer has a **Link CSV file (live)** button: in Chrome or Edge, click it
+once and pick an existing `.csv` (open dialog, opens in the sibling CSV's
+folder), grant readwrite permission, and the file is rewritten on every
+parameter change. The handle is persisted to IndexedDB; after a page reload
+the status shows *"linked … (click Link to re-activate)"* — one click
+re-grants permission and live sync resumes without re-picking the file.
+
+The **Download processed CSV** button is the one-shot alternative: in
+Chrome/Edge (standalone) it opens a save dialog in the sibling CSV's folder
+with the sibling's name pre-filled (rename as needed); in other browsers it
+falls back to a classic browser download.
 
 ### Saving a preset
 
