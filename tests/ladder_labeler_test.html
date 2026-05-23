@@ -339,6 +339,51 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('refreshAll preserves sigmaM (idempotent on unchanged spectrum)',
           near(sigBefore, sigAfter, 1e-9),
           'before=' + sigBefore + ' after=' + sigAfter);
+
+    // ---------- Task 10 tests: buildAnnotations ----------
+    resetLabelerState();
+    const spec3 = makeLadderSpectrum();
+    LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, spec3.X, spec3.Y);
+
+    // Disabled: should return empty arrays
+    LadderLabeler.state.enabled = false;
+    let g = LadderLabeler.buildAnnotations();
+    check('buildAnnotations returns empty arrays when disabled',
+          g.annotations.length === 0 && g.shapes.length === 0);
+
+    LadderLabeler.state.enabled = true;
+    g = LadderLabeler.buildAnnotations(spec3.X, spec3.Y);
+
+    check('buildAnnotations returns dashed seed line',
+          g.shapes.length >= 1 && g.shapes[0].line.dash === 'dash',
+          JSON.stringify(g.shapes[0]));
+
+    check('seed line is at the seed m/z',
+          Math.abs(g.shapes[0].x0 - 3300) < 1e-9);
+
+    check('annotations include a header summary line for ladder A',
+          g.annotations.some(a => typeof a.text === 'string'
+                                  && a.text.indexOf('Ladder A') >= 0));
+
+    const rungAnnots = g.annotations.filter(a => a.xref === 'x' && a.x !== undefined);
+    check('annotations include per-rung labels with charge tag',
+          rungAnnots.length >= 6 && rungAnnots[0].text.match(/\d+\+/));
+
+    check('annotation color matches ladder color',
+          rungAnnots.every(a => a.font && a.font.color === LadderLabeler.state.ladders[0].color));
+
+    // Two ladders → ay offset differs by ladderIndex
+    LadderLabeler.addLadderFromSeed({ mz: 3302.5, z: 16 }, spec3.X, spec3.Y);
+    g = LadderLabeler.buildAnnotations(spec3.X, spec3.Y);
+    const aRungs = g.annotations.filter(a => a.xref === 'x'
+                                              && a.font.color === LadderLabeler.state.ladders[0].color);
+    const bRungs = g.annotations.filter(a => a.xref === 'x'
+                                              && a.font.color === LadderLabeler.state.ladders[1].color);
+    check('two ladders → both produce rung annotations',
+          aRungs.length >= 1 && bRungs.length >= 1);
+
+    check('ladder B annotations use a different ay offset than ladder A',
+          bRungs[0].ay !== aRungs[0].ay);
   } catch (err) {
     const div = document.createElement('pre');
     div.className = 'fail-line';

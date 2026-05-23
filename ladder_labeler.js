@@ -224,15 +224,94 @@ const LadderLabeler = (function () {
     for (const L of state.ladders) refreshLadder(L.id, specX, specY);
   }
 
+  // Linear interpolation of the currently plotted intensity at any m/z.
+  // specX/specY are passed explicitly to keep this testable.
+  function _yAt(mz, specX, specY) {
+    if (!specX || specX.length === 0) return 0;
+    // Binary search for the first index with specX[i] >= mz.
+    let lo = 0, hi = specX.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (specX[mid] < mz) lo = mid + 1; else hi = mid;
+    }
+    if (lo === 0) return specY[0] || 0;
+    const x0 = specX[lo - 1], x1 = specX[lo];
+    const y0 = specY[lo - 1] || 0, y1 = specY[lo] || 0;
+    if (x1 === x0) return y1;
+    const t = (mz - x0) / (x1 - x0);
+    return y0 + t * (y1 - y0);
+  }
+
+  // Returns { annotations, shapes } ready to merge into Plotly's layout.
+  function buildAnnotations(specX, specY) {
+    if (!state.enabled) return { annotations: [], shapes: [] };
+    const annots = [];
+    const shapes = [];
+    let ladderIdx = 0;
+    for (const L of state.ladders) {
+      // 1. Dashed seed vertical line (spec §5.2).
+      shapes.push({
+        type: 'line',
+        x0: L.seed.mz, x1: L.seed.mz,
+        yref: 'paper', y0: 0, y1: 1,
+        line: { color: L.color, width: 1, dash: 'dash' },
+      });
+
+      // 2. Header summary line (spec §5.4) — stacked above the plot.
+      const foundCount = L.labels.filter(lb => lb.mzObs !== null).length;
+      const amber = L.M > 0 && (L.sigmaM / L.M) > state.sigmaAmberRelative;
+      const hdrColor = amber ? '#cc4400' : L.color;
+      const hdrText = 'Ladder ' + L.id + ':  M = ' + C.formatMass(L.M, L.sigmaM)
+                    + '  ' + C.formatSigma(L.M, L.sigmaM)
+                    + '  (z₀ = ' + L.seed.z + '+, ' + foundCount + ' rungs)'
+                    + (amber ? '  — check assignments' : '');
+      annots.push({
+        text: hdrText,
+        xref: 'paper', yref: 'paper',
+        x: 0.0, y: 1.10 + 0.04 * ladderIdx,
+        xanchor: 'left', showarrow: false,
+        font: { size: 11, color: hdrColor },
+      });
+
+      // 3. Per-rung annotations (spec §5.2, §5.3 hover).
+      const yshift = -40 * ladderIdx;
+      for (const lb of L.labels) {
+        if (lb.mzObs === null) continue;
+        const prefix = lb.manual ? 'M ' : '';
+        const txt = prefix + lb.z + '+<br>' + lb.mzObs.toFixed(2);
+        const hoverM = (lb.mImplied !== null)
+                        ? C.formatMass(lb.mImplied, Math.max(L.sigmaM, 1))
+                        : '?';
+        annots.push({
+          x: lb.mzObs,
+          y: _yAt(lb.mzObs, specX, specY),
+          xref: 'x', yref: 'y',
+          text: txt,
+          showarrow: true, arrowhead: 2, arrowsize: 0.6, arrowwidth: 1,
+          ax: 0, ay: yshift - 22,
+          font: { size: 10, color: L.color },
+          bgcolor: 'rgba(255,255,255,0.78)',
+          hovertext: 'Ladder ' + L.id + ' — z = ' + lb.z + '+\nM = '
+                   + hoverM + ' (this rung)' + (lb.stale ? ' [stale]' : ''),
+          opacity: lb.stale ? 0.4 : 1.0,
+        });
+      }
+      ladderIdx++;
+    }
+    return { annotations: annots, shapes };
+  }
+
   return {
     state,
     _resetIdCounter,
     _candidateRungs,
+    _yAt,
     addLadderFromSeed,
     addLadderFromTwoClicks,
     removeLadder,
     setActive,
     refreshLadder,
     refreshAll,
+    buildAnnotations,
   };
 })();
