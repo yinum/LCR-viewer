@@ -416,6 +416,14 @@ class TestProcessSpectrum(unittest.TestCase):
         _, py_sm = blv.process_spectrum(self.MZ, self.IT, 230.0, smooth)
         self.assertNotEqual(py_raw, py_sm)
 
+    def test_scale_off_skips_charge_reduced_scaling(self):
+        # MS1 mode: scale_on=False means no point is multiplied even above thr.
+        preset = dict(blv.PRESET, method="none", scale=10, scale_on=False)
+        px, py = blv.process_spectrum(self.MZ, self.IT, 230.0, preset)
+        gmz, git, _ = blv.build_grid(self.MZ, self.IT)
+        for i in range(len(gmz)):
+            self.assertAlmostEqual(py[i], git[i], delta=1e-6)
+
 
 class TestBuildCsv(unittest.TestCase):
     def test_header_and_drops_zero_rows(self):

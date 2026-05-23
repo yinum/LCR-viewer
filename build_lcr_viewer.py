@@ -36,7 +36,10 @@ import sys, os, json, re, math, datetime
 # viewer's Save preset button) on top of these; these values are used whenever
 # no preset.json is present next to the script.
 PRESET = {
-    "scale": 10,            # charge-reduced x factor
+    "scale_on": True,       # apply the charge-reduced x factor at all; turn off
+                            # for plain MS1 smoothing (everything stays x1, and
+                            # the threshold line/annotation are hidden)
+    "scale": 10,            # charge-reduced x factor (used only when scale_on)
     "method": "avg",        # smoothing method (adjacent averaging)
     "width_mz": 0.04,       # smoothing width in m/z
     "poly": 3,              # SG poly order, retained for the SG control
@@ -374,8 +377,12 @@ def process_spectrum(mz, it, thr, preset):
     intensity. Mirrors the in-HTML recompute() so a build-time CSV equals the
     viewer's export at its default (preset) settings."""
     gmz, git, bounds = build_grid(mz, it)
-    factor = preset["scale"]
-    scaled = [(v * factor if gmz[i] >= thr else v) for i, v in enumerate(git)]
+    if preset.get("scale_on", True):
+        factor = preset["scale"]
+        scaled = [(v * factor if gmz[i] >= thr else v) for i, v in enumerate(git)]
+    else:
+        # MS1 / no-scale mode: smooth the raw intensities as-is.
+        scaled = list(git)
     proc_y = smooth_all(scaled, bounds, preset["method"],
                         preset["width_mz"], preset["poly"])
     return gmz, proc_y
@@ -399,6 +406,8 @@ def build_html(mz, it, thr, plotly, html_name, preset):
     that sibling file written next to the viewer (see main)."""
     csv_name = os.path.splitext(os.path.basename(html_name))[0] + ".csv"
     html = TEMPLATE
+    html = html.replace("__SCALEON__",
+                        "checked" if preset.get("scale_on", True) else "")
     html = html.replace("__SCALE__", str(preset["scale"]))
     html = html.replace("__THR__", "%g" % thr)
     html = html.replace("__WIDTH__", str(preset["width_mz"]))
@@ -593,6 +602,10 @@ TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
 <div id="controls">
+ <div class="ctl chk">
+   <label><input type="checkbox" id="scaleon" __SCALEON__>
+     Scale charge-reduced region
+     <span style="font-size:11px;color:#888">(off = plain MS1 smoothing)</span></label></div>
  <div class="ctl"><label>Charge-reduced x factor</label>
    <input type="number" id="scale" value="__SCALE__" step="1" min="1"></div>
  <div class="ctl"><label>Scale applies above m/z</label>
@@ -625,7 +638,8 @@ TEMPLATE = r"""<!DOCTYPE html>
       title="Processed CSV written next to this viewer at build time, using the preset defaults. Click 'Update sibling CSV' to overwrite it with the current on-screen settings.">__CSVHREF__</a></div>
 </div>
 <div class="hint">
- Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope stays x1;
+ Order: (1) if "Scale charge-reduced region" is on, m/z &ge; threshold x factor and
+ the parent envelope stays x1; off skips scaling entirely (plain MS1 smoothing);
  (2) sparse peaks are linearly interpolated onto a fine uniform m/z grid, then smoothed
  with zero-baseline padding - the smoothing width is in m/z, so it covers the same span
  on every peak, drawn as one continuous spectrum. Matches Origin's continuous-profile
@@ -785,14 +799,16 @@ function smoothAll(y,method,widthMz,p){
 // ---------- live pipeline ----------
 let PROC_X=[],PROC_Y=[];
 function recompute(){
- const factor=parseFloat(document.getElementById('scale').value)||1;
+ const scaleOn=document.getElementById('scaleon').checked;
+ const factor=scaleOn?(parseFloat(document.getElementById('scale').value)||1):1;
  const thr=parseFloat(document.getElementById('thr').value)||0;
  const method=document.getElementById('method').value;
  const widthMz=parseFloat(document.getElementById('width').value)||0.04;
  const p=parseInt(document.getElementById('poly').value)||3;
  const logy=document.getElementById('logy').checked;
  const rawov=document.getElementById('rawov').checked;
- const scaled=G.git.map((v,i)=>G.gmz[i]>=thr?v*factor:v);
+ // scaleOn off => smooth raw intensities as-is (plain MS1 mode).
+ const scaled=scaleOn?G.git.map((v,i)=>G.gmz[i]>=thr?v*factor:v):G.git.slice();
  const sm=smoothAll(scaled,method,widthMz,p);
  PROC_X=G.gmz; PROC_Y=sm;
  // Draw as one continuous line. Across an empty stretch wider than GROUP_GAP,
@@ -810,20 +826,22 @@ function recompute(){
   for(let i=b0;i<=b1;i++){px.push(G.gmz[i]);py.push(sm[i]);pov.push(scaled[i]);}
  }
  const traces=[];
- if(rawov)traces.push({x:px,y:pov,name:'scaled, pre-smooth',mode:'lines',
-   line:{width:0.8,color:'rgba(150,150,150,0.55)'}});
- traces.push({x:px,y:py,name:'scaled + smoothed',mode:'lines',
+ if(rawov)traces.push({x:px,y:pov,name:scaleOn?'scaled, pre-smooth':'pre-smooth',
+   mode:'lines',line:{width:0.8,color:'rgba(150,150,150,0.55)'}});
+ traces.push({x:px,y:py,name:scaleOn?'scaled + smoothed':'smoothed',mode:'lines',
    line:{width:1.3,color:'#0050b3'}});
  const layout={
    margin:{l:66,r:20,t:34,b:50},
    xaxis:{title:'m/z',showgrid:false},
-   yaxis:{title:'intensity'+(factor!==1?' (CR x'+factor+')':''),
+   yaxis:{title:'intensity'+(scaleOn&&factor!==1?' (CR x'+factor+')':''),
           type:logy?'log':'linear',rangemode:'tozero'},
    legend:{orientation:'h',y:1.12},
-   shapes:[{type:'line',x0:thr,x1:thr,yref:'paper',y0:0,y1:1,
-            line:{color:'#cc4400',width:1,dash:'dot'}}],
-   annotations:[{x:thr,yref:'paper',y:1.04,text:'x'+factor+' above',
-                 showarrow:false,font:{size:10,color:'#cc4400'}}]
+   // Threshold marker + "x N above" annotation are only meaningful when
+   // the charge-reduced scaling is on; hide them in plain MS1 mode.
+   shapes:scaleOn?[{type:'line',x0:thr,x1:thr,yref:'paper',y0:0,y1:1,
+            line:{color:'#cc4400',width:1,dash:'dot'}}]:[],
+   annotations:scaleOn?[{x:thr,yref:'paper',y:1.04,text:'x'+factor+' above',
+                 showarrow:false,font:{size:10,color:'#cc4400'}}]:[]
  };
  Plotly.react('plot',traces,layout,{responsive:true,
    toImageButtonOptions:{format:'png',scale:3,filename:'polyP_LCR_spectrum'}});
@@ -831,11 +849,20 @@ function recompute(){
    G.nseg+' peak segments, '+G.gmz.length+' grid points.';
  syncCSV();
 }
-['scale','thr','method','width','poly','logy','rawov'].forEach(id=>{
+['scaleon','scale','thr','method','width','poly','logy','rawov'].forEach(id=>{
  const el=document.getElementById(id);
  el.addEventListener('input',recompute);
  el.addEventListener('change',recompute);
 });
+// Dim scale/threshold inputs when the toggle is off -- they're inert in
+// plain MS1 mode, so the disabled state is the honest visual.
+function syncScaleEnabled(){
+ const on=document.getElementById('scaleon').checked;
+ document.getElementById('scale').disabled=!on;
+ document.getElementById('thr').disabled=!on;
+}
+document.getElementById('scaleon').addEventListener('change',syncScaleEnabled);
+syncScaleEnabled();
 function buildCSV(){
  // drop zero-intensity points (the zero-baseline grid and pad cells)
  let csv='m/z,intensity_processed\n';
@@ -843,16 +870,58 @@ function buildCSV(){
   if(PROC_Y[i]>0)csv+=PROC_X[i]+','+PROC_Y[i]+'\n';
  return csv;
 }
-document.getElementById('dl').addEventListener('click',()=>{
- const blob=new Blob([buildCSV()],{type:'text/csv'}),a=document.createElement('a');
+document.getElementById('dl').addEventListener('click',async()=>{
+ const text=buildCSV();
+ // FSA path: the Save dialog opens in the sibling CSV's folder thanks to the
+ // shared `lcr-sibling-csv` picker id (Chrome remembers the last directory
+ // used by any picker with that id). Rename in the dialog if you want a
+ // different filename. Cancelling is a no-op.
+ if(window.showSaveFilePicker&&location.protocol==='file:'){
+  try{
+   const h=await window.showSaveFilePicker({
+     suggestedName:CSV_NAME,
+     id:'lcr-sibling-csv',
+     types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});
+   const w=await h.createWritable();
+   await w.write(text); await w.close();
+  }catch(e){/* user cancelled the picker */}
+  return;
+ }
+ // Fallback (served mode, or browsers without FSA): classic download.
+ const blob=new Blob([text],{type:'text/csv'}),a=document.createElement('a');
  a.href=URL.createObjectURL(blob);a.download=CSV_NAME;a.click();
 });
 // ---- update sibling CSV: serve mode POSTs straight to the build-time file;
-// standalone uses the File System Access API and caches the handle so the
-// second click onwards writes without a picker. ----
+// standalone uses the File System Access API. The picked handle is persisted
+// in IndexedDB (keyed by CSV_NAME) so reloads skip the picker -- a click after
+// a reload only needs a one-shot readwrite re-grant. Chrome also remembers
+// the last directory for our stable picker id, so the very first pick can
+// land in the right folder without navigating the tree each time. ----
 let siblingHandle=null;
 const updateBtn=document.getElementById('updatecsv');
 const updateStat=document.getElementById('updatecsvstat');
+const HDB_NAME='lcr-viewer',HDB_STORE='handles';
+const HDB_SIBLING='sibling:'+CSV_NAME,HDB_LINK='link:'+CSV_NAME;
+function hdbOpen(){return new Promise((res,rej)=>{
+ const r=indexedDB.open(HDB_NAME,1);
+ r.onupgradeneeded=()=>r.result.createObjectStore(HDB_STORE);
+ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);});}
+async function hdbGet(key){try{const db=await hdbOpen();
+ return await new Promise((res,rej)=>{
+  const t=db.transaction(HDB_STORE,'readonly').objectStore(HDB_STORE).get(key);
+  t.onsuccess=()=>res(t.result||null); t.onerror=()=>rej(t.error);});
+ }catch(e){return null;}}
+async function hdbPut(key,h){try{const db=await hdbOpen();
+ await new Promise((res,rej)=>{
+  const t=db.transaction(HDB_STORE,'readwrite').objectStore(HDB_STORE).put(h,key);
+  t.onsuccess=()=>res(); t.onerror=()=>rej(t.error);});}catch(e){}}
+async function ensurePerm(h){const opts={mode:'readwrite'};
+ if((await h.queryPermission(opts))==='granted')return true;
+ return (await h.requestPermission(opts))==='granted';}
+if(window.showSaveFilePicker&&location.protocol==='file:'){
+ hdbGet(HDB_SIBLING).then(h=>{if(h){siblingHandle=h;
+   updateStat.textContent='linked '+h.name+' (click to update)';}});
+}
 updateBtn.addEventListener('click',async()=>{
  const text=buildCSV();
  if(location.protocol==='http:'||location.protocol==='https:'){
@@ -870,10 +939,15 @@ updateBtn.addEventListener('click',async()=>{
   return;
  }
  try{
+  if(siblingHandle&&!(await ensurePerm(siblingHandle))){
+   siblingHandle=null; await hdbPut(HDB_SIBLING,null);
+  }
   if(!siblingHandle){
    siblingHandle=await window.showSaveFilePicker({
      suggestedName:CSV_NAME,
+     id:'lcr-sibling-csv',
      types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});
+   await hdbPut(HDB_SIBLING,siblingHandle);
   }
   const w=await siblingHandle.createWritable();
   await w.write(text); await w.close();
@@ -886,23 +960,35 @@ if(!window.showSaveFilePicker&&location.protocol==='file:'){
  updateBtn.title='Needs Chrome/Edge for direct write, or run with --serve.';
  updateStat.textContent='direct write not supported in this browser';
 }
-// ---- linked-file live sync (File System Access API, Chromium only) ----
+// ---- linked-file live sync: pick an EXISTING CSV to sync into. Uses
+// showOpenFilePicker so the dialog is a "Pick file" rather than "Save as",
+// requests readwrite permission once, and persists the handle in IndexedDB
+// so reloads re-link silently (one click needed to re-grant permission).
+// Shares the `lcr-sibling-csv` picker id with the other CSV buttons so the
+// dialog lands in the sibling CSV's folder. ----
 let csvHandle=null,csvTimer=null;
 const linkBtn=document.getElementById('link');
 const csvStat=document.getElementById('csvstat');
-if(!window.showSaveFilePicker){
+if(!window.showOpenFilePicker){
  linkBtn.disabled=true;
  linkBtn.title='Live link needs Chrome or Edge; use Download instead.';
  csvStat.textContent='live link not supported in this browser';
 }else{
+ hdbGet(HDB_LINK).then(h=>{if(h){csvHandle=h;
+   csvStat.textContent='linked '+h.name+' (click Link to re-activate)';}});
  linkBtn.addEventListener('click',async()=>{
   try{
-   csvHandle=await window.showSaveFilePicker({
-     suggestedName:CSV_NAME,
-     types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});
-   csvStat.textContent='linked: '+csvHandle.name;
-   syncCSV();
-  }catch(e){/* user cancelled the picker */}
+   const [h]=await window.showOpenFilePicker({
+     id:'lcr-sibling-csv',
+     types:[{description:'CSV',accept:{'text/csv':['.csv']}}],
+     multiple:false});
+   if(!(await ensurePerm(h))){
+    csvStat.textContent='readwrite permission denied'; return;
+   }
+   csvHandle=h; await hdbPut(HDB_LINK,h);
+   csvStat.textContent='linked: '+csvHandle.name; syncCSV();
+  }catch(e){if(e.name!=='AbortError'){
+    csvStat.textContent='link failed: '+e.message;}}
  });
 }
 function syncCSV(){
@@ -910,6 +996,9 @@ function syncCSV(){
  clearTimeout(csvTimer);
  csvTimer=setTimeout(async()=>{
   try{
+   if((await csvHandle.queryPermission({mode:'readwrite'}))!=='granted'){
+    csvStat.textContent='click Link CSV file to re-grant permission'; return;
+   }
    const w=await csvHandle.createWritable();
    await w.write(buildCSV());
    await w.close();
@@ -920,6 +1009,7 @@ function syncCSV(){
 // ---- save preset.json (File System Access API, download fallback) ----
 function buildPreset(){
  return {
+  scale_on:document.getElementById('scaleon').checked,
   scale:parseFloat(document.getElementById('scale').value)||1,
   method:document.getElementById('method').value,
   width_mz:parseFloat(document.getElementById('width').value)||0.04,
