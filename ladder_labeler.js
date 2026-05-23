@@ -301,6 +301,96 @@ const LadderLabeler = (function () {
     return { annotations: annots, shapes };
   }
 
+  // Routes a Plotly click event. Caller passes the click m/z and the
+  // current processed-trace arrays. Returns one of:
+  //   { status: '…' }  — informational; caller may show in a status line
+  //   { error: '…' }   — recoverable problem; caller may show as a warning
+  //   { id: '…' }      — a ladder was created (its id is returned)
+  //   undefined        — nothing notable; caller should still re-render.
+  // Manual override convention (spec §4.4):
+  //   integer       → override the clicked label's z (no re-seed)
+  //   integer+'s'   → set the clicked peak as the new seed for its ladder
+  //   empty/cancel  → delete the clicked label
+  function handlePlotClick(clickedMz, specX, specY) {
+    if (!state.enabled) return { status: 'labeler disabled' };
+
+    // Two-click seed flow.
+    if (state.pendingMode === 'two-click') {
+      if (state.twoClickBuffer === null) {
+        state.twoClickBuffer = clickedMz;
+        return { status: 'first click recorded; click second rung' };
+      }
+      const m1 = state.twoClickBuffer;
+      state.twoClickBuffer = null;
+      state.pendingMode = null;
+      return addLadderFromTwoClicks(m1, clickedMz, specX, specY);
+    }
+
+    if (state.ladders.length === 0) {
+      return { error: 'no ladders yet — use + Type seed or + 2-click seed' };
+    }
+
+    // Check whether the click lands near an existing label.
+    for (const L of state.ladders) {
+      for (const lb of L.labels) {
+        if (lb.mzObs === null) continue;
+        if (Math.abs(lb.mzObs - clickedMz) <= state.tolMz) {
+          const ans = prompt(
+            'Edit label at m/z=' + lb.mzObs.toFixed(2) + ' (ladder ' + L.id + ').\n'
+            + 'Enter integer to override z, integer+s to set as new seed,'
+            + ' empty to delete.', String(lb.z));
+          if (ans === null) return;     // user cancelled
+          if (ans === '') {
+            L.labels = L.labels.filter(x => x !== lb);
+            return;
+          }
+          const seedFlag = /s$/i.test(ans);
+          const zStr = seedFlag ? ans.slice(0, -1) : ans;
+          const z = parseInt(zStr, 10);
+          if (!Number.isInteger(z) || z < 1 || String(z) !== zStr.trim()) {
+            return { error: 'unrecognized — expected integer, integer+s, or empty' };
+          }
+          if (seedFlag) {
+            L.seed = { mz: lb.mzObs, z };
+            refreshLadder(L.id, specX, specY);
+          } else {
+            lb.z = z;
+            lb.mImplied = C.computeM(z, lb.mzObs);
+            lb.manual = true;
+          }
+          return;
+        }
+      }
+    }
+
+    // No existing label nearby — try to create a manual one in the active ladder.
+    if (state.activeLadderId === null) {
+      return { error: 'no active ladder selected' };
+    }
+    const L = state.ladders.find(x => x.id === state.activeLadderId);
+    const mzObs = C.snapToMaxInWindow(clickedMz, specX, specY, state.tolMz);
+    if (mzObs === null) return { error: 'no peak in snap window' };
+    const ans = prompt(
+      'Add label at m/z=' + mzObs.toFixed(2) + ' (ladder ' + L.id + ').\n'
+      + 'Enter charge z (integer), or integer+s to set as new seed.');
+    if (ans === null || ans === '') return;
+    const seedFlag = /s$/i.test(ans);
+    const zStr = seedFlag ? ans.slice(0, -1) : ans;
+    const z = parseInt(zStr, 10);
+    if (!Number.isInteger(z) || z < 1 || String(z) !== zStr.trim()) {
+      return { error: 'unrecognized — expected integer or integer+s' };
+    }
+    if (seedFlag) {
+      if (z < 2) return { error: 'seed z must be ≥ 2' };
+      L.seed = { mz: mzObs, z };
+      refreshLadder(L.id, specX, specY);
+    } else {
+      L.labels.push({ z, mzPred: mzObs, mzObs,
+                      mImplied: C.computeM(z, mzObs),
+                      manual: true, stale: false });
+    }
+  }
+
   return {
     state,
     _resetIdCounter,
@@ -313,5 +403,6 @@ const LadderLabeler = (function () {
     refreshLadder,
     refreshAll,
     buildAnnotations,
+    handlePlotClick,
   };
 })();

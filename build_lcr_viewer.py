@@ -1217,6 +1217,87 @@ document.getElementById('ladder-tol').addEventListener('change', e => {
 
 // Render once on load.
 renderLadderPanel();
+
+// "+ Type seed" — prompt for z₀ + m/z, create a ladder
+document.getElementById('ladder-add-type').addEventListener('click', () => {
+  if (!LadderLabeler.state.enabled) {
+    document.getElementById('ladder-enabled').click();   // turn on automatically
+  }
+  const zStr = prompt('Precursor charge state z₀ (positive integer ≥ 2):');
+  if (zStr === null) return;
+  const z = parseInt(zStr, 10);
+  if (!Number.isInteger(z) || z < 2) {
+    document.getElementById('ladder-status').textContent =
+      'z₀ must be an integer ≥ 2';
+    return;
+  }
+  const mzStr = prompt('Precursor m/z:', String(precursor_from_name() || ''));
+  if (mzStr === null) return;
+  const mz = parseFloat(mzStr);
+  if (!isFinite(mz) || mz <= 0) {
+    document.getElementById('ladder-status').textContent =
+      'precursor m/z must be a positive number';
+    return;
+  }
+  const res = LadderLabeler.addLadderFromSeed({ mz, z }, PROC_X, PROC_Y);
+  if (res.error) {
+    document.getElementById('ladder-status').textContent = res.error;
+  } else {
+    document.getElementById('ladder-status').textContent =
+      'added ladder ' + res.id;
+  }
+  recompute();
+});
+
+// "+ 2-click seed" — switch into two-click capture mode
+document.getElementById('ladder-add-twoclick').addEventListener('click', () => {
+  if (!LadderLabeler.state.enabled) {
+    document.getElementById('ladder-enabled').click();
+  }
+  LadderLabeler.state.pendingMode = 'two-click';
+  LadderLabeler.state.twoClickBuffer = null;
+  document.getElementById('ladder-status').textContent =
+    'two-click mode: click first ladder rung in the plot…';
+});
+
+// "Clear all"
+document.getElementById('ladder-clear').addEventListener('click', () => {
+  LadderLabeler.state.ladders.length = 0;
+  LadderLabeler.state.activeLadderId = null;
+  LadderLabeler._resetIdCounter();
+  document.getElementById('ladder-status').textContent = 'cleared';
+  recompute();
+});
+
+// Subscribe to Plotly clicks (once, after first render).
+function attachPlotClick() {
+  const plot = document.getElementById('plot');
+  if (!plot || !plot.on) {
+    setTimeout(attachPlotClick, 50);
+    return;
+  }
+  plot.on('plotly_click', evt => {
+    if (!evt || !evt.points || evt.points.length === 0) return;
+    const clickedMz = evt.points[0].x;
+    const out = LadderLabeler.handlePlotClick(clickedMz, PROC_X, PROC_Y);
+    if (out) {
+      if (out.status) document.getElementById('ladder-status').textContent = out.status;
+      if (out.error)  document.getElementById('ladder-status').textContent = out.error;
+      if (out.id)     document.getElementById('ladder-status').textContent =
+                        'added ladder ' + out.id;
+    }
+    recompute();
+  });
+}
+attachPlotClick();
+
+// Helper for the type-seed default: read the precursor from the document title
+// or URL pathname (the build filename pattern LCR_mz<precursor>_...).
+function precursor_from_name() {
+  const m = (document.title + ' ' + (window.location.pathname || ''))
+              .match(/mz([0-9]+(?:\.[0-9]+)?)/);
+  return m ? parseFloat(m[1]) : '';
+}
 </script>
 </body>
 </html>

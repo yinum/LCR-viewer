@@ -384,6 +384,40 @@ if (typeof LadderLabelerCore === 'undefined') {
 
     check('ladder B annotations use a different ay offset than ladder A',
           bRungs[0].ay !== aRungs[0].ay);
+
+    // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
+    resetLabelerState();
+    const spec4 = makeLadderSpectrum();
+
+    // Disabled module → status message, no state change
+    LadderLabeler.state.enabled = false;
+    let r = LadderLabeler.handlePlotClick(3300, spec4.X, spec4.Y);
+    check('handlePlotClick disabled → status message',
+          r && r.status === 'labeler disabled');
+
+    // Enabled, two-click mode: first click buffers; second click solves.
+    LadderLabeler.state.enabled = true;
+    LadderLabeler.state.pendingMode = 'two-click';
+    LadderLabeler.state.twoClickBuffer = null;
+    r = LadderLabeler.handlePlotClick(3300, spec4.X, spec4.Y);
+    check('two-click first click → buffers',
+          r && r.status && r.status.indexOf('first click') >= 0);
+
+    r = LadderLabeler.handlePlotClick(3771, spec4.X, spec4.Y);
+    check('two-click second click → creates a ladder',
+          r && r.id === 'A',
+          JSON.stringify(r));
+
+    check('after two-click, pendingMode is cleared',
+          LadderLabeler.state.pendingMode === null
+          && LadderLabeler.state.twoClickBuffer === null);
+
+    // Click with no ladders and not in two-click mode → error
+    resetLabelerState();
+    LadderLabeler.state.enabled = true;
+    r = LadderLabeler.handlePlotClick(3300, spec4.X, spec4.Y);
+    check('click with no ladders → error suggesting Add buttons',
+          r && r.error && r.error.indexOf('no ladders') >= 0);
   } catch (err) {
     const div = document.createElement('pre');
     div.className = 'fail-line';
