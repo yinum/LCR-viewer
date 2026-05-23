@@ -1126,6 +1126,97 @@ document.getElementById('savepreset').addEventListener('click',async()=>{
  }
 });
 recompute();
+
+// ---------- ladder labeler: panel binding ----------
+// Hooks the LadderLabeler module to the control panel inserted in Task 9
+// and re-renders the panel + plot whenever the labeler state changes.
+function renderLadderPanel() {
+  const list = document.getElementById('ladder-list');
+  if (!list) return;
+  const st = LadderLabeler.state;
+  document.getElementById('ladder-enabled').checked = st.enabled;
+  document.getElementById('ladder-tol').value = st.tolMz;
+  if (st.ladders.length === 0) {
+    list.innerHTML = '<span style="color:#888">(none — use Add buttons)</span>';
+    return;
+  }
+  let html = '';
+  for (const L of st.ladders) {
+    const active = L.id === st.activeLadderId;
+    const foundCount = L.labels.filter(lb => lb.mzObs !== null).length;
+    const totalCount = L.labels.length;
+    html += '<div style="display:flex;align-items:center;gap:6px;'
+          + 'padding:2px 0;border-bottom:1px solid #eee">'
+          + '<input type="radio" name="ladder-active" data-id="' + L.id + '"'
+          + (active ? ' checked' : '') + '>'
+          + '<span style="display:inline-block;width:10px;height:10px;'
+          + 'background:' + L.color + ';border-radius:2px"></span>'
+          + '<b>' + L.id + '</b>'
+          + ' z₀=<input type="number" data-id="' + L.id + '" data-field="z" '
+          + 'value="' + L.seed.z + '" min="2" step="1" '
+          + 'style="width:46px;padding:1px 3px;font-size:11px">'
+          + ' m/z=<input type="number" data-id="' + L.id + '" data-field="mz" '
+          + 'value="' + L.seed.mz + '" step="0.1" '
+          + 'style="width:70px;padding:1px 3px;font-size:11px">'
+          + ' <span style="color:#666">'
+          + foundCount + '/' + totalCount + ' rungs</span>'
+          + ' <button data-id="' + L.id + '" data-action="remove" '
+          + 'style="margin-left:auto;padding:1px 6px;font-size:11px">✕</button>'
+          + '</div>';
+  }
+  list.innerHTML = html;
+
+  // Wire the per-row controls.
+  list.querySelectorAll('input[name="ladder-active"]').forEach(el => {
+    el.addEventListener('change', () => {
+      LadderLabeler.setActive(el.dataset.id);
+      recompute();
+    });
+  });
+  list.querySelectorAll('input[data-field]').forEach(el => {
+    el.addEventListener('change', () => {
+      const L = LadderLabeler.state.ladders.find(x => x.id === el.dataset.id);
+      if (!L) return;
+      const val = parseFloat(el.value);
+      if (el.dataset.field === 'z') {
+        if (!Number.isInteger(val) || val < 2) {
+          document.getElementById('ladder-status').textContent =
+            'z₀ must be an integer ≥ 2';
+          el.value = L.seed.z;
+          return;
+        }
+        L.seed.z = val;
+      } else if (el.dataset.field === 'mz') {
+        L.seed.mz = val;
+      }
+      LadderLabeler.refreshLadder(L.id, PROC_X, PROC_Y);
+      recompute();
+    });
+  });
+  list.querySelectorAll('button[data-action="remove"]').forEach(el => {
+    el.addEventListener('click', () => {
+      LadderLabeler.removeLadder(el.dataset.id);
+      recompute();
+    });
+  });
+}
+
+// Top-level panel controls (enable checkbox, tolerance input).
+document.getElementById('ladder-enabled').addEventListener('change', e => {
+  LadderLabeler.state.enabled = e.target.checked;
+  recompute();
+});
+document.getElementById('ladder-tol').addEventListener('change', e => {
+  const v = parseFloat(e.target.value);
+  if (isFinite(v) && v > 0) {
+    LadderLabeler.state.tolMz = v;
+    LadderLabeler.refreshAll(PROC_X, PROC_Y);
+    recompute();
+  }
+});
+
+// Render once on load.
+renderLadderPanel();
 </script>
 </body>
 </html>
