@@ -453,6 +453,10 @@ def build_html(mz, it, thr, plotly, html_name, preset, labeler_js):
     html = html.replace("__IT__", json.dumps(it))
     html = html.replace("__PLOTLY__", plotly)
     html = html.replace("__LADDER_LABELER__", labeler_js)
+    ll = preset.get("ladder_labels", {})
+    html = html.replace("__LADDER_ENABLED__",
+                        "checked" if ll.get("enabled", False) else "")
+    html = html.replace("__LADDER_TOL__", str(ll.get("tol_mz", 5.0)))
     return html
 
 def parse_args(argv, here):
@@ -671,6 +675,34 @@ TEMPLATE = r"""<!DOCTYPE html>
  <div class="ctl"><label>Sibling CSV file</label>
    <a id="csvfile" href="__CSVHREF__" download="__CSVHREF__"
       title="Processed CSV written next to this viewer at build time, using the preset defaults. Click 'Update sibling CSV' to overwrite it with the current on-screen settings.">__CSVHREF__</a></div>
+ <div class="ctl chk" style="border-left:1px solid #ddd;padding-left:14px">
+   <label><input type="checkbox" id="ladder-enabled" __LADDER_ENABLED__>
+     Ladder labels
+     <span style="font-size:11px;color:#888">(opt-in; off by default)</span></label>
+   <label style="display:flex;align-items:center;gap:6px;margin-top:4px">
+     Snap tol (m/z):
+     <input type="number" id="ladder-tol" value="__LADDER_TOL__" step="0.5"
+            min="0.1" max="50" style="width:70px;padding:3px 5px"></label>
+ </div>
+ <div class="ctl" style="min-width:280px">
+   <label>Ladders</label>
+   <div id="ladder-list"
+        style="font-size:11px;border:1px solid #ddd;border-radius:4px;
+               padding:4px 6px;min-height:28px;max-height:88px;overflow:auto;
+               background:#fafafa">
+     <span style="color:#888">(none — use Add buttons)</span>
+   </div>
+   <div style="display:flex;gap:4px;margin-top:4px">
+     <button id="ladder-add-type" style="font-size:11px;padding:3px 8px">
+       + Type seed</button>
+     <button id="ladder-add-twoclick" style="font-size:11px;padding:3px 8px">
+       + 2-click seed</button>
+     <button id="ladder-clear" style="font-size:11px;padding:3px 8px">
+       Clear all</button>
+   </div>
+   <span id="ladder-status"
+         style="font-size:11px;color:#888;margin-top:3px"></span>
+ </div>
 </div>
 <div class="hint">
  Order: (1) if "Scale charge-reduced region" is on, m/z &ge; threshold x factor and

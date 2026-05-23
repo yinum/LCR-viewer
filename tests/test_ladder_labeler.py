@@ -99,5 +99,46 @@ class TemplateSubstitutionTests(unittest.TestCase):
         self.assertNotIn("__LADDER_LABELER__", html)
 
 
+class PanelMarkupTests(unittest.TestCase):
+    """The viewer HTML carries the ladder-labels control panel markup
+    (always rendered; visible when the labeler is enabled)."""
+
+    def _build(self, ladder_labels=None):
+        preset = dict(B.PRESET)
+        if ladder_labels is not None:
+            preset["ladder_labels"] = ladder_labels
+        html = B.build_html([3000.0, 3100.0], [0.0, 1.0], 3050.0,
+                            "/* plotly */", "LCR_mz3000_20260522-1200.html",
+                            preset, "/* labeler */")
+        return html
+
+    def test_panel_has_enabled_checkbox(self):
+        html = self._build()
+        self.assertIn('id="ladder-enabled"', html)
+
+    def test_panel_has_tol_input(self):
+        html = self._build()
+        self.assertIn('id="ladder-tol"', html)
+
+    def test_tol_input_default_from_preset(self):
+        html = self._build()
+        self.assertIn('value="5.0"', html)  # the default tol_mz
+
+    def test_enabled_checked_when_preset_enabled(self):
+        html = self._build({"enabled": True, "tol_mz": 5.0,
+                            "sigma_amber_relative": 0.01})
+        self.assertIn('id="ladder-enabled" checked', html)
+
+    def test_panel_has_ladders_list_container(self):
+        html = self._build()
+        self.assertIn('id="ladder-list"', html)
+
+    def test_panel_has_add_buttons(self):
+        html = self._build()
+        self.assertIn('id="ladder-add-type"', html)
+        self.assertIn('id="ladder-add-twoclick"', html)
+        self.assertIn('id="ladder-clear"', html)
+
+
 if __name__ == "__main__":
     unittest.main()
