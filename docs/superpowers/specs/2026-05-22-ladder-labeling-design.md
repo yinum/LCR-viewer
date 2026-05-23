@@ -172,6 +172,11 @@ charge rung is at `m₁` (charge `z₁`); the lower-charge rung is at `m₂`
 between them — `k = 1` for adjacent rungs). Derivation in Appendix B.
 
 ```
+// Early-return for clicks that are physically the same peak. At native-MS
+// resolution, peaks are several m/z wide; any two clicks within 1 m/z
+// are the same peak and the math gives garbage z values.
+if (m₂ − m₁ < 1.0): return null
+
 candidates = []
 for k in [1, 2, 3, 4, 5]:
     z_raw = k · (m₂ − m_H) / (m₂ − m₁)
@@ -189,9 +194,12 @@ M    = best.z · m₁  −  best.z · m_H
 return { z: best.z, M, k: best.k }
 ```
 
-The multi-k sweep handles the case where the user clicks non-adjacent
-rungs (e.g., z=8 and z=6, skipping z=7) without forcing them to know k —
-only one k value will produce an integer-close result.
+The multi-k sweep handles non-adjacent rungs (e.g., z=8 and z=5, skipping
+z=7 and z=6) without forcing the user to know k. When `gcd(z₁, k) = 1`
+only one k gives an integer-close result. When `gcd(z₁, k) > 1` (e.g.,
+m/z ratios that are exactly rational), multiple k's all give integer-close
+zRaw — argmin_err returns the smallest-k (simplest) interpretation; the
+user can re-seed to a higher-M reading if context demands.
 
 `addLadderFromTwoClicks` then calls `addLadderFromSeed({ mz: m₁, z })`
 using the higher-charge click as the seed anchor.
