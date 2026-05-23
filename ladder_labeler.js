@@ -65,5 +65,42 @@ const LadderLabelerCore = (function () {
     return bestI < 0 ? null : specX[bestI];
   }
 
-  return { M_H, computeM, predictRung, solveFromTwoClicks, snapToMaxInWindow };
+  // Sample standard deviation. Returns 0 for length < 2.
+  function _stdDev(arr) {
+    const n = arr.length;
+    if (n < 2) return 0;
+    const mean = arr.reduce((s, v) => s + v, 0) / n;
+    const v = arr.reduce((s, x) => s + (x - mean) * (x - mean), 0) / (n - 1);
+    return Math.sqrt(v);
+  }
+
+  // Format M according to the precision rule in spec §5.4.
+  // precDa = 10 ^ floor(log10(sigma)); clamped at 1 Da.
+  // If M < 10000, render in Da rounded to precDa.
+  // Else render in kDa with decimals = max(0, 3 - floor(log10(sigma))).
+  function formatMass(M, sigmaM) {
+    const sig = Math.max(sigmaM, 1.0);
+    const lg = Math.floor(Math.log10(sig));
+    const precDa = Math.pow(10, lg);
+    if (M < 10000) {
+      const rounded = Math.round(M / precDa) * precDa;
+      return rounded.toLocaleString('en-US') + ' Da';
+    }
+    const decimals = Math.max(0, 3 - lg);
+    return (M / 1000).toFixed(decimals) + ' kDa';
+  }
+
+  // Format ± dispersion. Below sigma/M < 0.001 use absolute units;
+  // otherwise use percentage.
+  function formatSigma(M, sigmaM) {
+    if (M === 0 || sigmaM === 0) return '';
+    const rel = sigmaM / M;
+    if (rel < 0.001) {
+      return '± ' + formatMass(sigmaM, sigmaM);
+    }
+    return '± ' + (rel * 100).toFixed(1) + '%';
+  }
+
+  return { M_H, computeM, predictRung, solveFromTwoClicks,
+           snapToMaxInWindow, _stdDev, formatMass, formatSigma };
 })();

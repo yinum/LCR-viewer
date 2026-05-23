@@ -124,6 +124,51 @@ if (typeof LadderLabelerCore === 'undefined') {
 
     check('snap picks global max in window (not just nearest)',
           SNAP(3768, tX, tY, 10) === 3771);
+
+    // ---------- Task 5 tests: formatMass + formatSigma + _stdDev ----------
+    const FM = LadderLabelerCore.formatMass;
+    const FS = LadderLabelerCore.formatSigma;
+    const STD = LadderLabelerCore._stdDev;
+
+    // stdDev sanity
+    check('_stdDev([26390, 26391, 26392, 26393, 26394]) ≈ 1.58',
+          near(STD([26390, 26391, 26392, 26393, 26394]), 1.58, 0.01),
+          'got ' + STD([26390, 26391, 26392, 26393, 26394]));
+
+    check('_stdDev of one element → 0',
+          STD([42]) === 0);
+
+    check('_stdDev of empty array → 0',
+          STD([]) === 0);
+
+    // formatMass: small M, σ ≈ 1 → 1-Da precision, displayed in Da
+    check('formatMass(8432, 1.0) ≈ "8,432 Da"',
+          FM(8432, 1.0) === '8,432 Da',
+          'got ' + FM(8432, 1.0));
+
+    // formatMass: large M, σ ≈ 1 → 3 decimals in kDa
+    check('formatMass(26391.94, 1.0) === "26.392 kDa"',
+          FM(26391.94, 1.0) === '26.392 kDa',
+          'got ' + FM(26391.94, 1.0));
+
+    // formatMass: large M, σ ≈ 80 → 2 decimals in kDa, rounds to 10 Da precision
+    check('formatMass(26391.94, 80) === "26.39 kDa"',
+          FM(26391.94, 80) === '26.39 kDa',
+          'got ' + FM(26391.94, 80));
+
+    // formatMass: large M, σ ≈ 800 → 1 decimal in kDa
+    check('formatMass(26391.94, 800) === "26.4 kDa"',
+          FM(26391.94, 800) === '26.4 kDa',
+          'got ' + FM(26391.94, 800));
+
+    // formatSigma: relative form by default
+    check('formatSigma(26000, 100) === "± 0.4%"',
+          FS(26000, 100) === '± 0.4%',
+          'got ' + FS(26000, 100));
+
+    check('formatSigma at very small rel uses absolute units',
+          FS(26000, 5).indexOf('Da') >= 0 || FS(26000, 5).indexOf('kDa') >= 0,
+          'got ' + FS(26000, 5));
   } catch (err) {
     const div = document.createElement('pre');
     div.className = 'fail-line';
