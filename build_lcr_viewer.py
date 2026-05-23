@@ -428,12 +428,13 @@ def build_csv(proc_x, proc_y):
             lines.append("%s,%s" % (x, y))
     return "\n".join(lines) + "\n"
 
-def build_html(mz, it, thr, plotly, html_name, preset):
+def build_html(mz, it, thr, plotly, html_name, preset, labeler_js):
     """Assemble a self-contained viewer HTML from spectrum data, the
-    per-spectrum threshold, and the inlined Plotly bundle. Control defaults
-    come from the effective preset (see load_preset). The processed-CSV
-    download/link/sibling-file reuses html_name's stem so the CSV matches its
-    viewer (LCR_mz<precursor>_<timestamp>.csv); the header hyperlink points at
+    per-spectrum threshold, the inlined Plotly bundle, and the inlined
+    ladder-labeler JS. Control defaults come from the effective preset
+    (see load_preset). The processed-CSV download/link/sibling-file
+    reuses html_name's stem so the CSV matches its viewer
+    (LCR_mz<precursor>_<timestamp>.csv); the header hyperlink points at
     that sibling file written next to the viewer (see main)."""
     csv_name = os.path.splitext(os.path.basename(html_name))[0] + ".csv"
     html = TEMPLATE
@@ -451,6 +452,7 @@ def build_html(mz, it, thr, plotly, html_name, preset):
     html = html.replace("__MZ__", json.dumps(mz))
     html = html.replace("__IT__", json.dumps(it))
     html = html.replace("__PLOTLY__", plotly)
+    html = html.replace("__LADDER_LABELER__", labeler_js)
     return html
 
 def parse_args(argv, here):
@@ -566,6 +568,8 @@ def main():
 
     with open(os.path.join(here, "plotly-basic.min.js")) as fh:
         plotly = fh.read()
+    with open(os.path.join(here, "ladder_labeler.js")) as fh:
+        labeler_js = fh.read()
     preset = load_preset(here)
 
     files = iter_spectrum_files(src)
@@ -586,7 +590,7 @@ def main():
         else:
             prec, source = precursor_mz(mz, it), "base peak"
         name = output_filename(prec)
-        html = build_html(mz, it, thr, plotly, name, preset)
+        html = build_html(mz, it, thr, plotly, name, preset, labeler_js)
         out = os.path.join(out_dir, name)
         with open(out, "w") as fh:
             fh.write(html)
@@ -678,6 +682,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 </div>
 <div id="plot"></div>
 <script>__PLOTLY__</script>
+<script>__LADDER_LABELER__</script>
 <script>
 const RAW_MZ=__MZ__;
 const RAW_IT=__IT__;

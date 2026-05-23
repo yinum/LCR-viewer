@@ -3,7 +3,7 @@
 //
 // This file is loaded two ways:
 //   1. Inlined into the viewer HTML at build time by build_lcr_viewer.py
-//      (via the __LADDER_LABELER__ placeholder).
+//      (via the LADDER_LABELER template placeholder).
 //   2. Loaded directly by tests/ladder_labeler_test.html for pure-math tests.
 //
 // All pure functions live on LadderLabelerCore (testable without DOM/Plotly).

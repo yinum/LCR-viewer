@@ -94,7 +94,7 @@ class TestBuildHtml(unittest.TestCase):
     NAME = "LCR_mz2092_20260522-0907.html"
 
     def test_preset_values_baked_in(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET, "")
         self.assertIn('id="scale" value="10"', html)
         self.assertIn('id="width" value="0.04"', html)
         self.assertIn('id="thr" value="123.45"', html)
@@ -107,7 +107,7 @@ class TestBuildHtml(unittest.TestCase):
         self.assertNotIn("__SCALE__", html)
 
     def test_linked_csv_feature_present(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET, "")
         self.assertIn('id="link"', html)          # Link CSV button
         self.assertIn("showSaveFilePicker", html)  # File System Access API
         self.assertIn("buildCSV", html)            # shared CSV helper
@@ -117,7 +117,7 @@ class TestBuildHtml(unittest.TestCase):
         self.assertNotIn("polyP_LCR_processed.csv", html)
 
     def test_sibling_csv_hyperlink_present(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET, "")
         self.assertIn('id="csvfile"', html)        # header hyperlink element
         # links to the sibling CSV file in the same folder
         self.assertIn('href="LCR_mz2092_20260522-0907.csv"', html)
@@ -126,20 +126,20 @@ class TestBuildHtml(unittest.TestCase):
     def test_custom_preset_overrides_controls(self):
         custom = {"scale": 7, "method": "sg", "width_mz": 0.02,
                   "poly": 2, "show_overlay": True}
-        html = blv.build_html(self.MZ, self.IT, 50.0, "/*plotly*/", self.NAME, custom)
+        html = blv.build_html(self.MZ, self.IT, 50.0, "/*plotly*/", self.NAME, custom, "")
         self.assertIn('id="scale" value="7"', html)
         self.assertIn('id="width" value="0.02"', html)
         self.assertIn('value="sg" selected', html)
         self.assertIn('id="rawov" checked', html)
 
     def test_save_preset_button_present(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET, "")
         self.assertIn('id="savepreset"', html)   # Save preset button
         self.assertIn("buildPreset", html)       # JS gathers control values
         self.assertIn("preset.json", html)       # target filename
 
     def test_update_sibling_csv_button_present(self):
-        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET, "")
         self.assertIn('id="updatecsv"', html)    # Update sibling CSV button
         self.assertIn("/csv?name=", html)        # serve-mode POST endpoint
         self.assertIn("siblingHandle", html)     # file:// FSA handle cache
@@ -374,7 +374,7 @@ class TestSavePostedPreset(unittest.TestCase):
 class TestServedSavePreset(unittest.TestCase):
     def test_viewer_supports_served_and_standalone_save(self):
         html = blv.build_html([100.0, 100.2], [5.0, 9.0], 123.45,
-                              "/*plotly*/", "LCR_mz123_x.html", blv.PRESET)
+                              "/*plotly*/", "LCR_mz123_x.html", blv.PRESET, "")
         self.assertIn("location.protocol", html)   # served-mode branch
         self.assertIn("/preset", html)             # POST endpoint
         self.assertIn("showSaveFilePicker", html)  # standalone fallback kept
