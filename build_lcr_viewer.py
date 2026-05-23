@@ -62,6 +62,19 @@ def load_preset(here):
             eff[k] = saved[k]
     return eff
 
+def save_posted_csv(out_dir, csv_written, name, body):
+    """Write a posted CSV body to a sibling file in out_dir. Used by --serve
+    when the viewer's "Update sibling CSV" button POSTs its current on-screen
+    CSV. name must be one of the build's csv_written entries -- this both
+    prevents path traversal and limits writes to the actual sibling files the
+    build produced. Returns the written path."""
+    if name not in csv_written:
+        raise ValueError("unknown sibling CSV: %r" % name)
+    path = os.path.join(out_dir, name)
+    with open(path, "w") as fh:
+        fh.write(body)
+    return path
+
 def save_posted_preset(here, data):
     """Write preset.json next to the script from a posted preset dict; only
     keys present in PRESET are kept. Used by --serve when the viewer's
@@ -460,23 +473,41 @@ def serve(out_dir, written, csv_written, here):
                 self._send(404, "not found")
 
         def do_POST(self):
-            if self.path.split("?")[0].rstrip("/") != "/preset":
-                self._send(404, "not found"); return
-            try:
-                n = int(self.headers.get("Content-Length", 0))
-                data = json.loads(self.rfile.read(n).decode("utf-8"))
-                path = save_posted_preset(here, data)
-                self._send(200, json.dumps({"ok": True}), "application/json")
-                print("preset saved -> %s" % path)
-            except (ValueError, OSError) as e:
-                self._send(400, json.dumps({"ok": False, "error": str(e)}),
-                           "application/json")
+            from urllib.parse import urlsplit, parse_qs
+            parts = urlsplit(self.path)
+            route = parts.path.rstrip("/")
+            n = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(n)
+            if route == "/preset":
+                try:
+                    data = json.loads(raw.decode("utf-8"))
+                    path = save_posted_preset(here, data)
+                    self._send(200, json.dumps({"ok": True}),
+                               "application/json")
+                    print("preset saved -> %s" % path)
+                except (ValueError, OSError) as e:
+                    self._send(400, json.dumps({"ok": False, "error": str(e)}),
+                               "application/json")
+                return
+            if route == "/csv":
+                try:
+                    name = parse_qs(parts.query).get("name", [""])[0]
+                    path = save_posted_csv(out_dir, csv_written, name,
+                                           raw.decode("utf-8"))
+                    self._send(200, json.dumps({"ok": True}),
+                               "application/json")
+                    print("sibling CSV updated -> %s" % path)
+                except (ValueError, OSError) as e:
+                    self._send(400, json.dumps({"ok": False, "error": str(e)}),
+                               "application/json")
+                return
+            self._send(404, "not found")
 
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     url = "http://127.0.0.1:%d/" % srv.server_address[1]
     print("\nServing %d viewer(s) at %s" % (len(written), url))
-    print('"Save preset" in the viewer now writes preset.json directly. '
-          "Ctrl-C to stop.")
+    print('"Save preset" writes preset.json and "Update sibling CSV" '
+          "overwrites the build-time CSV directly. Ctrl-C to stop.")
     try:
         webbrowser.open(url)
     except Exception:
@@ -583,13 +614,15 @@ TEMPLATE = r"""<!DOCTYPE html>
    <label><input type="checkbox" id="rawov" __RAWOV__> pre-smoothing overlay</label>
    <label><input type="checkbox" id="logy"> log Y axis</label></div>
  <div class="ctl"><button id="dl">Download processed CSV</button></div>
+ <div class="ctl"><button id="updatecsv">Update sibling CSV</button>
+   <span id="updatecsvstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
  <div class="ctl"><button id="link">Link CSV file (live)</button>
    <span id="csvstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
  <div class="ctl"><button id="savepreset">Save preset</button>
    <span id="presetstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
  <div class="ctl"><label>Sibling CSV file</label>
    <a id="csvfile" href="__CSVHREF__" download="__CSVHREF__"
-      title="Processed CSV written next to this viewer at build time, using the preset defaults. Use the Download / Link buttons for the current on-screen settings.">__CSVHREF__</a></div>
+      title="Processed CSV written next to this viewer at build time, using the preset defaults. Click 'Update sibling CSV' to overwrite it with the current on-screen settings.">__CSVHREF__</a></div>
 </div>
 <div class="hint">
  Order: (1) charge-reduced region (m/z &ge; threshold) x factor, parent envelope stays x1;
@@ -814,6 +847,45 @@ document.getElementById('dl').addEventListener('click',()=>{
  const blob=new Blob([buildCSV()],{type:'text/csv'}),a=document.createElement('a');
  a.href=URL.createObjectURL(blob);a.download=CSV_NAME;a.click();
 });
+// ---- update sibling CSV: serve mode POSTs straight to the build-time file;
+// standalone uses the File System Access API and caches the handle so the
+// second click onwards writes without a picker. ----
+let siblingHandle=null;
+const updateBtn=document.getElementById('updatecsv');
+const updateStat=document.getElementById('updatecsvstat');
+updateBtn.addEventListener('click',async()=>{
+ const text=buildCSV();
+ if(location.protocol==='http:'||location.protocol==='https:'){
+  try{
+   const r=await fetch('/csv?name='+encodeURIComponent(CSV_NAME),{method:'POST',
+     headers:{'Content-Type':'text/csv'},body:text});
+   const j=await r.json();
+   updateStat.textContent=j.ok?'updated '+CSV_NAME
+     :'update failed: '+(j.error||r.status);
+  }catch(e){updateStat.textContent='update failed: '+e.message;}
+  return;
+ }
+ if(!window.showSaveFilePicker){
+  updateStat.textContent='needs Chrome/Edge or --serve';
+  return;
+ }
+ try{
+  if(!siblingHandle){
+   siblingHandle=await window.showSaveFilePicker({
+     suggestedName:CSV_NAME,
+     types:[{description:'CSV',accept:{'text/csv':['.csv']}}]});
+  }
+  const w=await siblingHandle.createWritable();
+  await w.write(text); await w.close();
+  updateStat.textContent='updated '+siblingHandle.name;
+ }catch(e){if(e.name!=='AbortError'){
+   updateStat.textContent='write failed: '+e.message;}}
+});
+if(!window.showSaveFilePicker&&location.protocol==='file:'){
+ updateBtn.disabled=true;
+ updateBtn.title='Needs Chrome/Edge for direct write, or run with --serve.';
+ updateStat.textContent='direct write not supported in this browser';
+}
 // ---- linked-file live sync (File System Access API, Chromium only) ----
 let csvHandle=null,csvTimer=null;
 const linkBtn=document.getElementById('link');

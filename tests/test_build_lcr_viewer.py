@@ -138,6 +138,42 @@ class TestBuildHtml(unittest.TestCase):
         self.assertIn("buildPreset", html)       # JS gathers control values
         self.assertIn("preset.json", html)       # target filename
 
+    def test_update_sibling_csv_button_present(self):
+        html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET)
+        self.assertIn('id="updatecsv"', html)    # Update sibling CSV button
+        self.assertIn("/csv?name=", html)        # serve-mode POST endpoint
+        self.assertIn("siblingHandle", html)     # file:// FSA handle cache
+
+
+class TestSavePostedCsv(unittest.TestCase):
+    def setUp(self):
+        self.out = tempfile.mkdtemp()
+        self.name = "LCR_mz123_test.csv"
+        self.csv_written = [self.name]
+
+    def tearDown(self):
+        for n in os.listdir(self.out):
+            os.unlink(os.path.join(self.out, n))
+        os.rmdir(self.out)
+
+    def test_writes_allowed_name(self):
+        body = "m/z,intensity_processed\n100.0,42.0\n"
+        path = blv.save_posted_csv(self.out, self.csv_written, self.name, body)
+        self.assertEqual(path, os.path.join(self.out, self.name))
+        with open(path) as fh:
+            self.assertEqual(fh.read(), body)
+
+    def test_rejects_unknown_name(self):
+        with self.assertRaises(ValueError):
+            blv.save_posted_csv(self.out, self.csv_written, "other.csv", "x")
+
+    def test_rejects_path_traversal(self):
+        # even a crafted name fails the csv_written membership check
+        with self.assertRaises(ValueError):
+            blv.save_posted_csv(self.out, self.csv_written,
+                                "../escape.csv", "x")
+        self.assertEqual(os.listdir(self.out), [])
+
 
 class TestMainIntegration(unittest.TestCase):
     def test_folder_input_writes_named_viewers(self):
