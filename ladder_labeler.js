@@ -49,5 +49,21 @@ const LadderLabelerCore = (function () {
     return { z: best.z, M, k: best.k };
   }
 
-  return { M_H, computeM, predictRung, solveFromTwoClicks };
+  // Global-max-in-window snap. Returns the m/z of the highest-intensity
+  // sample within ±tolMz of mzPred, or null if the window is empty.
+  // Spec §4.2: native-MS peaks are broad, so global-max is more robust
+  // than a 3-point local-max test against centroid noise.
+  // Assumes specX is ascending (true for the viewer's PROC_X).
+  function snapToMaxInWindow(mzPred, specX, specY, tolMz) {
+    const lo = mzPred - tolMz, hi = mzPred + tolMz;
+    let bestI = -1, bestY = -Infinity;
+    for (let i = 0; i < specX.length; i++) {
+      if (specX[i] < lo) continue;
+      if (specX[i] > hi) break;
+      if (specY[i] > bestY) { bestY = specY[i]; bestI = i; }
+    }
+    return bestI < 0 ? null : specX[bestI];
+  }
+
+  return { M_H, computeM, predictRung, solveFromTwoClicks, snapToMaxInWindow };
 })();

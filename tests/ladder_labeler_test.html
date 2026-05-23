@@ -94,6 +94,36 @@ if (typeof LadderLabelerCore === 'undefined') {
 
     check('identical clicks → null',
           sol(3300, 3300) === null);
+
+    // ---------- Task 4 tests: snapToMaxInWindow ----------
+    const SNAP = LadderLabelerCore.snapToMaxInWindow;
+
+    // Synthetic spectrum: Gaussian-shaped peak around m/z = 3771, width σ ≈ 2 m/z.
+    const sX = [], sY = [];
+    for (let mz = 3700; mz <= 3850; mz += 0.5) {
+      sX.push(mz);
+      sY.push(Math.exp(-Math.pow((mz - 3771) / 2, 2)));
+    }
+
+    check('snap to apex of broad Gaussian within ±5 m/z tolerance',
+          near(SNAP(3770, sX, sY, 5), 3771, 0.5),
+          'got ' + SNAP(3770, sX, sY, 5));
+
+    check('window with no points returns null',
+          SNAP(2000, sX, sY, 5) === null);
+
+    check('window at right edge still returns the apex if it falls in range',
+          near(SNAP(3775, sX, sY, 5), 3771, 0.5));
+
+    check('empty spectrum returns null',
+          SNAP(3771, [], [], 5) === null);
+
+    // Two-peak spectrum, snap should pick the higher one in the window
+    const tX = [3760, 3765, 3771, 3777, 3782];
+    const tY = [0.3,   0.5,  0.8,  0.4,  0.2];
+
+    check('snap picks global max in window (not just nearest)',
+          SNAP(3768, tX, tY, 10) === 3771);
   } catch (err) {
     const div = document.createElement('pre');
     div.className = 'fail-line';
