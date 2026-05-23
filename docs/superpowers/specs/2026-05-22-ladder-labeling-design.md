@@ -166,19 +166,35 @@ narrow rungs both use the global setting.
 
 ### 4.3 Two-click solver — `solveFromTwoClicks`
 
-Given two clicks `m_a, m_b` with `m_a < m_b` (swap if necessary), assuming
-adjacent ladder rungs (z, z+1) of the same parent in positive mode:
+Given two clicks `m₁, m₂` with `m₁ < m₂` (swap if necessary). The higher-
+charge rung is at `m₁` (charge `z₁`); the lower-charge rung is at `m₂`
+(charge `z₁ − k`, where `k ≥ 1` is the number of charge-reduction steps
+between them — `k = 1` for adjacent rungs). Derivation in Appendix B.
 
 ```
-z_raw = (m_b − m_H) / (m_a − m_b)
-z     = round(z_raw)
-if |z − z_raw| > 0.2:
+candidates = []
+for k in [1, 2, 3, 4, 5]:
+    z_raw = k · (m₂ − m_H) / (m₂ − m₁)
+    z     = round(z_raw)
+    if z < 2: continue                          // need z₁ ≥ 2 to have any reduction
+    err   = |z − z_raw|
+    if err < 0.2:                               // close enough to an integer
+        candidates.append({k, z, err})
+
+if candidates is empty:
     return null   // status: "ambiguous two-click — pick farther-apart rungs"
-M = z·m_a − z·m_H
-return { z, M }
+
+best = argmin_err(candidates)   // smallest |z − z_raw| wins
+M    = best.z · m₁  −  best.z · m_H
+return { z: best.z, M, k: best.k }
 ```
 
-`addLadderFromTwoClicks` then calls `addLadderFromSeed({ mz: m_a, z })`.
+The multi-k sweep handles the case where the user clicks non-adjacent
+rungs (e.g., z=8 and z=6, skipping z=7) without forcing them to know k —
+only one k value will produce an integer-close result.
+
+`addLadderFromTwoClicks` then calls `addLadderFromSeed({ mz: m₁, z })`
+using the higher-charge click as the seed anchor.
 
 ### 4.4 Manual override
 
@@ -417,6 +433,94 @@ labeled** — only marked by the dashed vertical line):
 
 ---
 
+## Appendix B — derivation: recovering z from two ladder rungs
+
+### B.1 Setup
+
+Two ladder rungs of the same parent neutral mass `M`, positive mode:
+
+- Rung 1: charge `z₁`, observed m/z `m₁`
+- Rung 2: charge `z₂`, observed m/z `m₂`
+
+Convention `m₁ < m₂` (so `z₁ > z₂` — higher charge gives lower m/z because
+m/z = M/z + m_H). Adjacent rungs satisfy `z₂ = z₁ − 1`; in general
+`z₂ = z₁ − k` for integer `k ≥ 1`.
+
+### B.2 Same-parent constraint
+
+The defining property of a ladder is that every rung gives the same M:
+
+```
+M = z₁·m₁ − z₁·m_H            (1)
+M = z₂·m₂ − z₂·m_H            (2)
+```
+
+Setting (1) = (2) and substituting `z₂ = z₁ − k`:
+
+```
+z₁·m₁ − z₁·m_H  =  (z₁ − k)·m₂ − (z₁ − k)·m_H
+z₁·m₁ − z₁·m_H  =  z₁·m₂ − k·m₂ − z₁·m_H + k·m_H
+z₁·(m₁ − m₂)   =  −k·m₂ + k·m_H
+z₁·(m₂ − m₁)   =   k·(m₂ − m_H)        (multiply by −1)
+```
+
+### B.3 Closed form
+
+```
+                k · (m₂ − m_H)
+        z₁  =  ────────────────              (3)
+                  m₂ − m₁
+
+        M   =  z₁·m₁ − z₁·m_H               (use (1))
+```
+
+### B.4 Sanity checks (m_H = 1.00727646677)
+
+| (m₁, m₂)         | k | z₁_raw                       | round | OK? |
+|------------------|---|------------------------------|------:|-----|
+| (3300, 3771)     | 1 | (3771 − 1.007)/(3771 − 3300) = 3770.0/471 = 8.0008 | 8 | ✓ |
+| (3771, 4400)     | 1 | 4399.0/629 = 6.993                                  | 7 | ✓ |
+| (3300, 4400)     | 1 | 4399.0/1100 = 3.999                                 | 4 | ✗ — these are z=8 and z=6, not adjacent |
+| (3300, 4400)     | 2 | 2·4399.0/1100 = 8.0                                 | 8 | ✓ — correct k |
+| (5279, 13197)    | 1 | 13196.0/7918 = 1.667                                | 2 | ✗ — far from integer |
+| (5279, 13197)    | 3 | 3·13196.0/7918 = 5.000                              | 5 | ✓ — z=5 to z=2, k=3 |
+
+The multi-k sweep automatically picks the right k.
+
+### B.5 Why this works at native-MS resolution
+
+The formula above is exact for true rung m/z values. With centroid error `δ`
+on each click (independent, ~equal magnitude):
+
+```
+   δz₁     δm₂   m₁         δm₁    m₂ − m_H
+   ────  ≈ ──── · ──── ·  +   ───· ─────────       (linearize (3))
+    z₁      m₂   m₂ − m₁     m₁   (m₂ − m₁)·m₂
+```
+
+For native-MS conditions:
+- `m₂ − m₁ ≈ 500` m/z (typical adjacent-rung spacing for kDa species)
+- `δ ≈ 5` m/z (broad-peak centroid wobble)
+- → `δz₁/z₁ ≈ 2%`
+
+For true `z₁ = 8`, observed `z₁_raw ≈ 7.84 to 8.16` — well inside the
+`|z − z_raw| < 0.2` tolerance gate. The solver is robust at native-MS
+resolution **provided the two clicks are reasonably far apart in m/z**
+(if `m₂ − m₁ ≈ 50` instead of 500, the error budget tightens 10×).
+
+### B.6 Why the spec doesn't use isotope spacing instead
+
+Isotope-spacing charge determination (`z = round(1 / Δm/z)` between
+adjacent isotope peaks) is the standard method at high resolution. It
+**does not apply here** because native polyP at QTOF resolution shows
+unresolved isotope envelopes — the peak shape is a Gaussian-like envelope
+1–10 m/z wide, not a comb of 1/z-spaced isotopes. The ladder-spacing
+method recovers z from spacings between *charge states*, not isotopes,
+and those spacings (hundreds of m/z) survive 5-m/z centroid wobble.
+
+---
+
 **Approved sections:** §1–§10 incrementally during brainstorming on
-2026-05-22. Pending user review of this written spec before invoking
+2026-05-22. Appendix B added in response to user request for the explicit
+derivation. Pending user review of this written spec before invoking
 `superpowers:writing-plans`.
