@@ -1092,7 +1092,15 @@ function buildPreset(){
   method:document.getElementById('method').value,
   width_mz:parseFloat(document.getElementById('width').value)||0.04,
   poly:parseInt(document.getElementById('poly').value)||3,
-  show_overlay:document.getElementById('rawov').checked
+  show_overlay:document.getElementById('rawov').checked,
+  ladder_labels:{
+   enabled:document.getElementById('ladder-enabled').checked,
+   tol_mz:parseFloat(document.getElementById('ladder-tol').value)||5.0,
+   sigma_amber_relative:
+    (typeof LadderLabeler!=='undefined')
+     ?LadderLabeler.state.sigmaAmberRelative
+     :0.01,
+  },
  };
 }
 const presetStat=document.getElementById('presetstat');
@@ -1187,6 +1195,12 @@ function renderLadderPanel() {
         }
         L.seed.z = val;
       } else if (el.dataset.field === 'mz') {
+        if (!isFinite(val) || val <= 0) {
+          document.getElementById('ladder-status').textContent =
+            'precursor m/z must be a positive number';
+          el.value = L.seed.mz;
+          return;
+        }
         L.seed.mz = val;
       }
       LadderLabeler.refreshLadder(L.id, PROC_X, PROC_Y);
@@ -1226,7 +1240,7 @@ document.getElementById('ladder-add-type').addEventListener('click', () => {
   const zStr = prompt('Precursor charge state z₀ (positive integer ≥ 2):');
   if (zStr === null) return;
   const z = parseInt(zStr, 10);
-  if (!Number.isInteger(z) || z < 2) {
+  if (!Number.isInteger(z) || z < 2 || String(z) !== zStr.trim()) {
     document.getElementById('ladder-status').textContent =
       'z₀ must be an integer ≥ 2';
     return;

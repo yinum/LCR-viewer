@@ -377,7 +377,7 @@ A self-contained test page that loads `LadderLabeler` and runs assertions:
 
 - `computeM(8, 3300.0)` → `26 392.4` (within 0.1)
 - `predictRung(26 392.4, 7)` → `3771.05` (within 0.1)
-- `solveFromTwoClicks(3300.0, 3771.0)` → `{z: 7, M ≈ 26 392.4}`
+- `solveFromTwoClicks(3300.0, 3771.0)` → `{z: 8, M ≈ 26 391.94}` (closed-form sanity; the lower-m/z click is the higher-charge rung)
 - `solveFromTwoClicks(3300.0, 3300.5)` → `null` (ambiguous)
 - `snapToMaxInWindow` on a synthetic broad peak (Gaussian, σ = 2 m/z)
   returns the apex within `±tolMz`.
