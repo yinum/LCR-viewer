@@ -257,7 +257,9 @@ const LadderLabeler = (function () {
         line: { color: L.color, width: 1, dash: 'dash' },
       });
 
-      // 2. Header summary line (spec §5.4) — stacked above the plot.
+      // 2. Header summary line (spec §5.4) — stacked inside the plot at top-left.
+      // Placed in-plot (paper y just under 1.0) rather than above the plot, so
+      // the M readout stays visible inside the layout's small top margin.
       const foundCount = L.labels.filter(lb => lb.mzObs !== null).length;
       const amber = L.M > 0 && (L.sigmaM / L.M) > state.sigmaAmberRelative;
       const hdrColor = amber ? '#cc4400' : L.color;
@@ -268,9 +270,11 @@ const LadderLabeler = (function () {
       annots.push({
         text: hdrText,
         xref: 'paper', yref: 'paper',
-        x: 0.0, y: 1.10 + 0.04 * ladderIdx,
-        xanchor: 'left', showarrow: false,
+        x: 0.01, y: 0.98 - 0.05 * ladderIdx,
+        xanchor: 'left', yanchor: 'top', showarrow: false,
         font: { size: 11, color: hdrColor },
+        bgcolor: 'rgba(255,255,255,0.85)',
+        bordercolor: hdrColor, borderwidth: 1, borderpad: 3,
       });
 
       // 3. Per-rung annotations (spec §5.2, §5.3 hover).
