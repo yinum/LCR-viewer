@@ -42,25 +42,38 @@ function check(name, condition, detail) {
   log.appendChild(div);
 }
 
-// ---------- Task 2 tests: M_H, computeM, predictRung ----------
-check('M_H is the proton mass to 9 sig figs',
-      near(LadderLabelerCore.M_H, 1.00727646677, 1e-10),
-      'got ' + LadderLabelerCore.M_H);
+if (typeof LadderLabelerCore === 'undefined') {
+  summary.className = 'fail';
+  summary.textContent = 'LOAD ERROR — ladder_labeler.js not found or has a syntax error';
+} else {
+  try {
+    // ---------- Task 2 tests: M_H, computeM, predictRung ----------
+    check('M_H is the proton mass to 9 sig figs',
+          near(LadderLabelerCore.M_H, 1.00727646677, 1e-10),
+          'got ' + LadderLabelerCore.M_H);
 
-check('computeM(8, 3300) ≈ 26391.94 Da',
-      near(LadderLabelerCore.computeM(8, 3300), 26391.94, 0.1),
-      'got ' + LadderLabelerCore.computeM(8, 3300));
+    check('computeM(8, 3300) ≈ 26391.94 Da',
+          near(LadderLabelerCore.computeM(8, 3300), 26391.94, 0.1),
+          'got ' + LadderLabelerCore.computeM(8, 3300));
 
-check('predictRung(26391.94, 7) ≈ 3771.28',
-      near(LadderLabelerCore.predictRung(26391.94, 7), 3771.28, 0.05),
-      'got ' + LadderLabelerCore.predictRung(26391.94, 7));
+    check('predictRung(26391.94, 7) ≈ 3771.28',
+          near(LadderLabelerCore.predictRung(26391.94, 7), 3771.28, 0.05),
+          'got ' + LadderLabelerCore.predictRung(26391.94, 7));
 
-check('round-trip: predictRung(computeM(z, mz), z) === mz',
-      near(LadderLabelerCore.predictRung(LadderLabelerCore.computeM(8, 3300), 8), 3300, 1e-9));
+    check('round-trip: predictRung(computeM(z, mz), z) === mz',
+          near(LadderLabelerCore.predictRung(LadderLabelerCore.computeM(8, 3300), 8), 3300, 1e-9));
+  } catch (err) {
+    const div = document.createElement('pre');
+    div.className = 'fail-line';
+    div.textContent = '✗ uncaught error during tests — ' + (err && err.message ? err.message : err);
+    log.appendChild(div);
+    failed++;
+  }
 
-// ---------- summary ----------
-summary.className = failed === 0 ? 'pass' : 'fail';
-summary.textContent = passed + ' passed, ' + failed + ' failed.';
+  // ---------- summary ----------
+  summary.className = failed === 0 ? 'pass' : 'fail';
+  summary.textContent = passed + ' passed, ' + failed + ' failed.';
+}
 </script>
 </body>
 </html>
