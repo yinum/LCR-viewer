@@ -49,6 +49,26 @@ class PresetBlockTests(unittest.TestCase):
             self.assertEqual(eff["ladder_labels"]["tol_mz"], 8.0)
             self.assertEqual(eff["ladder_labels"]["sigma_amber_relative"], 0.02)
 
+    def test_load_preset_ignores_non_dict_ladder_labels(self):
+        """A malformed saved value (e.g. boolean) for a dict-valued preset
+        key must not corrupt eff[k] — the defaults stand."""
+        with tempfile.TemporaryDirectory() as td:
+            with open(os.path.join(td, "preset.json"), "w") as fh:
+                json.dump({"ladder_labels": True}, fh)
+            eff = B.load_preset(td)
+            self.assertEqual(eff["ladder_labels"], B.PRESET["ladder_labels"])
+
+    def test_load_preset_empty_ladder_labels_keeps_defaults(self):
+        """An empty saved ladder_labels block is valid; all sub-keys
+        fall back to their defaults via the nested merge."""
+        with tempfile.TemporaryDirectory() as td:
+            with open(os.path.join(td, "preset.json"), "w") as fh:
+                json.dump({"ladder_labels": {}}, fh)
+            eff = B.load_preset(td)
+            self.assertEqual(eff["ladder_labels"]["enabled"], False)
+            self.assertEqual(eff["ladder_labels"]["tol_mz"], 5.0)
+            self.assertEqual(eff["ladder_labels"]["sigma_amber_relative"], 0.01)
+
 
 if __name__ == "__main__":
     unittest.main()

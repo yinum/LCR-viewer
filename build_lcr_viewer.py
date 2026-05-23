@@ -30,7 +30,7 @@ file dialog); plain runs and standalone file:// viewers are unaffected.
 The Plotly basic bundle (plotly-basic.min.js) must sit next to this script;
 download once from https://cdn.plot.ly/plotly-basic-2.35.2.min.js
 """
-import sys, os, json, re, math, datetime
+import sys, os, json, re, math, datetime, copy
 
 # Built-in fallback preset. load_preset() overlays preset.json (written by the
 # viewer's Save preset button) on top of these; these values are used whenever
@@ -58,8 +58,10 @@ def load_preset(here):
     readable one sits next to the script. preset.json is written by the
     viewer's Save preset button; only keys also present in PRESET are taken.
     The 'ladder_labels' value is a nested dict; we merge it key-by-key so a
-    partial saved block does not drop the other defaults."""
-    eff = dict(PRESET)
+    partial saved block does not drop the other defaults. Returns a deep
+    copy so callers can mutate the result without touching the module-level
+    PRESET."""
+    eff = copy.deepcopy(PRESET)
     path = os.path.join(here, "preset.json")
     if not os.path.exists(path):
         return eff
@@ -72,7 +74,9 @@ def load_preset(here):
     for k in PRESET:
         if k not in saved:
             continue
-        if isinstance(PRESET[k], dict) and isinstance(saved[k], dict):
+        if isinstance(PRESET[k], dict):
+            if not isinstance(saved[k], dict):
+                continue  # malformed; keep the deepcopied default
             merged = dict(PRESET[k])
             for ik in PRESET[k]:
                 if ik in saved[k]:
@@ -97,9 +101,19 @@ def save_posted_csv(out_dir, csv_written, name, body):
 
 def save_posted_preset(here, data):
     """Write preset.json next to the script from a posted preset dict; only
-    keys present in PRESET are kept. Used by --serve when the viewer's
-    "Save preset" button POSTs its current settings. Returns the written path."""
-    clean = {k: data[k] for k in PRESET if k in data}
+    keys present in PRESET are kept, and nested-dict values are sanitized to
+    the sub-keys that PRESET declares. This keeps the saved file in a shape
+    load_preset will round-trip cleanly."""
+    clean = {}
+    for k in PRESET:
+        if k not in data:
+            continue
+        if isinstance(PRESET[k], dict):
+            if not isinstance(data[k], dict):
+                continue  # malformed nested value; skip
+            clean[k] = {ik: data[k][ik] for ik in PRESET[k] if ik in data[k]}
+        else:
+            clean[k] = data[k]
     path = os.path.join(here, "preset.json")
     with open(path, "w") as fh:
         json.dump(clean, fh, indent=2)
