@@ -169,7 +169,10 @@ const LadderLabeler = (function () {
     // Preserve manual overrides across re-snapping. Auto labels are rebuilt.
     const manualPreserved = L.labels.filter(lb => lb.manual);
     L.labels = [];
+    // Manual labels take precedence over auto rungs at the same z.
+    const manualZ = new Set(manualPreserved.map(lb => lb.z));
     for (const z of _candidateRungs(L.seed.z)) {
+      if (manualZ.has(z)) continue;  // skip; the preserved manual at this z is re-added below
       const mzPred = C.predictRung(L.M, z);
       const mzObs = C.snapToMaxInWindow(mzPred, specX, specY, state.tolMz);
       const mImplied = (mzObs === null) ? null : C.computeM(z, mzObs);

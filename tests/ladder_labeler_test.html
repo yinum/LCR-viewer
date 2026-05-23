@@ -239,6 +239,23 @@ if (typeof LadderLabelerCore === 'undefined') {
     // active ladder is the most recently added valid one
     check('first valid ladder becomes the active ladder',
           LadderLabeler.state.activeLadderId === 'A');
+
+    // Dedup: manual label at z=5 takes precedence over auto rebuild at z=5
+    resetLabelerState();
+    const spec_d = makeLadderSpectrum();
+    LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, spec_d.X, spec_d.Y);
+    const Ld = LadderLabeler.state.ladders[0];
+    // Inject a manual label at z=5 (mimics a user override)
+    Ld.labels = Ld.labels.filter(lb => lb.z !== 5);
+    Ld.labels.push({ z: 5, mzPred: 5279.4, mzObs: 5279.6,
+                     mImplied: LadderLabelerCore.computeM(5, 5279.6),
+                     manual: true, stale: false });
+    // Re-snap; manual label must not be duplicated by the auto rebuild at z=5
+    LadderLabeler.refreshLadder(Ld.id, spec_d.X, spec_d.Y);
+    const z5entries = Ld.labels.filter(lb => lb.z === 5);
+    check('refreshLadder dedup: manual at z=5 prevents auto duplicate',
+          z5entries.length === 1 && z5entries[0].manual === true,
+          'got ' + z5entries.length + ' entries at z=5');
   } catch (err) {
     const div = document.createElement('pre');
     div.className = 'fail-line';
