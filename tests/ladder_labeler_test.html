@@ -62,6 +62,38 @@ if (typeof LadderLabelerCore === 'undefined') {
 
     check('round-trip: predictRung(computeM(z, mz), z) === mz',
           near(LadderLabelerCore.predictRung(LadderLabelerCore.computeM(8, 3300), 8), 3300, 1e-9));
+
+    // ---------- Task 3 tests: solveFromTwoClicks ----------
+    // Algorithm note: when gcd(z₁, k) > 1 the math has multiple valid
+    // interpretations; argmin_err picks the smallest-k (simplest) one.
+    // These test cases use gcd(z₁, k) = 1 inputs for unambiguous answers.
+    function sol(m1, m2) { return LadderLabelerCore.solveFromTwoClicks(m1, m2); }
+
+    check('adjacent rungs (3300, 3771) → z=8, k=1',
+          sol(3300, 3771) && sol(3300, 3771).z === 8 && sol(3300, 3771).k === 1,
+          JSON.stringify(sol(3300, 3771)));
+
+    check('adjacent rungs swapped order (3771, 3300) → same result',
+          sol(3771, 3300) && sol(3771, 3300).z === 8 && sol(3771, 3300).k === 1);
+
+    check('non-adjacent (3300, 5279) — z=8 and z=5 — solver finds k=3',
+          sol(3300, 5279) && sol(3300, 5279).z === 8 && sol(3300, 5279).k === 3,
+          JSON.stringify(sol(3300, 5279)));
+
+    check('non-adjacent (5279, 13197) — z=5 and z=2 — solver finds k=3',
+          sol(5279, 13197) && sol(5279, 13197).z === 5 && sol(5279, 13197).k === 3,
+          JSON.stringify(sol(5279, 13197)));
+
+    check('M is computed from the higher-charge click',
+          near(sol(3300, 3771).M, 8 * 3300 - 8 * LadderLabelerCore.M_H, 1e-6),
+          'got ' + sol(3300, 3771).M);
+
+    check('ambiguous: clicks too close in m/z → null',
+          sol(3300, 3300.5) === null,
+          JSON.stringify(sol(3300, 3300.5)));
+
+    check('identical clicks → null',
+          sol(3300, 3300) === null);
   } catch (err) {
     const div = document.createElement('pre');
     div.className = 'fail-line';

@@ -23,5 +23,31 @@ const LadderLabelerCore = (function () {
     return (M + z * M_H) / z;
   }
 
-  return { M_H, computeM, predictRung };
+  // Closed-form charge recovery from any two ladder rungs (positive mode).
+  // Multi-k sweep handles non-adjacent picks: when gcd(z₁, k) = 1, only the
+  // correct k yields an integer-close result. When gcd(z₁, k) > 1 (e.g.,
+  // m₂/m₁ is rational), multiple k's all give integer-close zRaw — argmin_err
+  // returns the smallest-err candidate, which in practice is the smallest k
+  // (the simplest interpretation). Users can re-seed if a larger-M reading
+  // is needed. See spec §4.3 and Appendix B.
+  function solveFromTwoClicks(m1, m2) {
+    if (m1 > m2) { const t = m1; m1 = m2; m2 = t; }
+    if (m2 - m1 < 1.0) return null;            // identical or too-close clicks
+    let best = null;
+    for (let k = 1; k <= 5; k++) {
+      const zRaw = (k * (m2 - M_H)) / (m2 - m1);
+      const z = Math.round(zRaw);
+      if (z < 2) continue;                     // need z₀ ≥ 2
+      const err = Math.abs(z - zRaw);
+      if (err >= 0.2) continue;                // not integer-close enough
+      if (best === null || err < best.err) {
+        best = { k, z, err };
+      }
+    }
+    if (best === null) return null;
+    const M = best.z * m1 - best.z * M_H;
+    return { z: best.z, M, k: best.k };
+  }
+
+  return { M_H, computeM, predictRung, solveFromTwoClicks };
 })();
