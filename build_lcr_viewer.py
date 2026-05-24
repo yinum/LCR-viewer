@@ -1148,6 +1148,24 @@ function renderLadderPanel() {
     list.innerHTML = '<span style="color:#888">(none — use Add buttons)</span>';
     return;
   }
+  function chipsFor(L) {
+    // Sort labels by descending z so chips read 7+, 6+, 5+, …
+    const sorted = L.labels.slice().sort((a, b) => b.z - a.z);
+    let out = '';
+    for (const lb of sorted) {
+      const live = lb.mzObs !== null && !lb.stale;
+      const included = !L.excludedZ.has(lb.z);
+      const mark = !live ? '—' : (included ? '✓' : '✗');
+      const bg = !live ? '#eee' : (included ? '#d6e9f8' : '#f8dada');
+      const fg = !live ? '#bbb' : (included ? '#1a4a7a' : '#7a1a1a');
+      const cur = !live ? 'default' : 'pointer';
+      out += '<span class="auc-chip" data-ladder="' + L.id + '" data-z="' + lb.z
+          + '" style="font-size:10px;padding:1px 4px;border-radius:3px;'
+          + 'background:' + bg + ';color:' + fg + ';cursor:' + cur
+          + ';user-select:none">' + mark + lb.z + '+</span>';
+    }
+    return out;
+  }
   let html = '';
   for (const L of st.ladders) {
     const active = L.id === st.activeLadderId;
@@ -1161,6 +1179,11 @@ function renderLadderPanel() {
     const mTxt = 'M = ' + LadderLabelerCore.formatMass(L.M, L.sigmaM)
                + '  ' + LadderLabelerCore.formatSigma(L.M, L.sigmaM)
                + (amber ? '  — check assignments' : '');
+    const abTxt = (L.abundance === null) ? 'Abund. = —'
+                  : ('Abund. = ' + (L.abundance * 100).toFixed(1) + '%'
+                     + (L.isPartial ? ' (partial)' : ''));
+    const sumTxt = (L.aucSum === 0) ? 'ΣAUC = —'
+                   : 'ΣAUC = ' + L.aucSum.toExponential(1);
     html += '<div style="border-bottom:1px solid #eee;padding:2px 0">'
           + '<div style="display:flex;align-items:center;gap:6px">'
           + '<input type="radio" name="ladder-active" data-id="' + L.id + '"'
@@ -1180,7 +1203,15 @@ function renderLadderPanel() {
           + 'style="margin-left:auto;padding:1px 6px;font-size:11px">✕</button>'
           + '</div>'
           + '<div style="padding:1px 0 2px 22px;font-size:11px;color:'
-          + mColor + '">' + mTxt + '</div>'
+          + mColor + '">' + mTxt
+          + '  <span style="color:#444">· ' + abTxt + '</span>'
+          + '</div>'
+          + '<div style="padding:0 0 2px 22px;font-size:10px;color:#888">'
+          + sumTxt + '</div>'
+          + '<div data-ladder="' + L.id + '" '
+          + 'style="padding:0 0 4px 22px;display:flex;flex-wrap:wrap;gap:3px">'
+          + chipsFor(L)
+          + '</div>'
           + '</div>';
   }
   list.innerHTML = html;
@@ -1222,6 +1253,14 @@ function renderLadderPanel() {
     el.addEventListener('click', () => {
       LadderLabeler.removeLadder(el.dataset.id);
       recompute();
+    });
+  });
+  list.querySelectorAll('span.auc-chip').forEach(el => {
+    // Only live chips are clickable.
+    if (el.style.cursor !== 'pointer') return;
+    el.addEventListener('click', () => {
+      LadderLabeler.toggleAucInclude(el.dataset.ladder, parseInt(el.dataset.z, 10));
+      renderLadderPanel();
     });
   });
 }
