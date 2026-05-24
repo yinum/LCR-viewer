@@ -174,6 +174,8 @@ const LadderLabeler = (function () {
     enabled: false,
     tolMz: 5.0,
     sigmaAmberRelative: 0.01,
+    threshold: Infinity,      // m/z at/above which intensity is LCR-scaled
+    scale: 1,                 // multiplier the viewer applied above threshold
     ladders: [],
     activeLadderId: null,
     pendingMode: null,        // null | 'two-click'
@@ -210,6 +212,10 @@ const LadderLabeler = (function () {
       M: C.computeM(z, mz),
       sigmaM: 0,
       labels: [],
+      excludedZ: new Set(),
+      aucSum: 0,
+      isPartial: false,
+      abundance: null,
     };
     state.ladders.push(ladder);
     state.activeLadderId = ladder.id;

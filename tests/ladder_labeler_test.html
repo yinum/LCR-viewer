@@ -453,6 +453,21 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('trapzAuc with iLo === iHi returns 0',
           TRZ(5, 5, trX, trY, noUnscale) === 0);
 
+    // ---------- New: state.threshold / state.scale defaults; L.excludedZ ----------
+    check('state.threshold defaults to +Infinity',
+          LadderLabeler.state.threshold === Infinity,
+          'got ' + LadderLabeler.state.threshold);
+    check('state.scale defaults to 1',
+          LadderLabeler.state.scale === 1,
+          'got ' + LadderLabeler.state.scale);
+
+    resetLabelerState();
+    const specE = makeLadderSpectrum();
+    LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, specE.X, specE.Y);
+    const Le = LadderLabeler.state.ladders[0];
+    check('new ladder has empty L.excludedZ Set',
+          Le.excludedZ instanceof Set && Le.excludedZ.size === 0);
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();
