@@ -361,9 +361,9 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('seed line is at the seed m/z',
           Math.abs(g.shapes[0].x0 - 3300) < 1e-9);
 
-    check('annotations include a header summary line for ladder A',
-          g.annotations.some(a => typeof a.text === 'string'
-                                  && a.text.indexOf('Ladder A') >= 0));
+    check('annotations carry ladder identity in hovertext',
+          g.annotations.some(a => typeof a.hovertext === 'string'
+                                  && a.hovertext.indexOf('Ladder A') >= 0));
 
     const rungAnnots = g.annotations.filter(a => a.xref === 'x' && a.x !== undefined);
     check('annotations include per-rung labels with charge tag',
