@@ -517,8 +517,8 @@ if (typeof LadderLabelerCore === 'undefined') {
           'aucSum=' + Lr.aucSum + ' expected=' + expectedSum);
 
     // makeRatioSpectrum covers 3500..5800 m/z. The standard ladder predicts
-    // rungs at z=7..1 of M≈26392. Rungs above z=5 fall outside the spectrum
-    // and are therefore unsnapped → isPartial must be true.
+    // rungs at z=7..1 of M≈26392. Rungs at z=4 down to z=1 (at higher m/z)
+    // fall outside the spectrum and are therefore unsnapped → isPartial must be true.
     check('isPartial=true when some candidate rung is unsnapped',
           Lr.isPartial === true);
 

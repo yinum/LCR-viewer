@@ -274,11 +274,11 @@ const LadderLabeler = (function () {
       .slice()
       .sort((a, b) => a.mzObs - b.mzObs);
 
-    // Build a Map from z → auc so we can update L.labels non-destructively.
-    // Label objects are replaced with new copies carrying the updated .auc,
-    // preserving all other fields (mzObs, mzPred, mImplied, manual, stale…).
-    // This keeps pre-call references (z6 = labels.find(…)) stable so callers
-    // can compare old vs new values across back-to-back computeLadderAuc calls.
+    // Replace label objects with new copies rather than mutating in place,
+    // so a caller that holds a reference into L.labels through the call is
+    // not surprised by sudden field changes on the object they kept. All
+    // fields (mzObs, mzPred, mImplied, manual, stale…) are shallow-copied;
+    // only .auc is overwritten.
     const aucByZ = new Map();
     for (const lb of L.labels) {
       aucByZ.set(lb.z, lb.mzObs === null ? null : 0);
