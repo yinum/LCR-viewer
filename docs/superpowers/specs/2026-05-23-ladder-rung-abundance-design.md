@@ -185,22 +185,24 @@ Scientific notation, 2 significant figures. When `aucSum === 0`, render
 `ΣAUC = —`. Purpose: a magnitude sanity check that makes pathological
 integration obvious without burdening the rung rows.
 
-### 5.3 Rung table — AUC include column
+### 5.3 Per-rung chip row
 
-Add one column at the right of the existing per-rung row:
+The current side panel does not have a per-rung table to extend (the
+original spec assumed one existed). Each ladder card instead carries a
+compact horizontal chip row under its M readout, one chip per candidate
+rung:
 
-| Header | Cell | Default |
-|--------|------|---------|
-| `AUC?` | `<input type="checkbox" data-ladder="A" data-z="5">` | `checked` when `!L.excludedZ.has(z)` |
+`[✓7+] [✓6+] [✗5+] [✓4+] [—3+] [—2+] [—1+]`
 
-Stale or unsnapped rungs (`mzObs === null || stale`) render a disabled,
-unchecked checkbox — they cannot contribute to AUC regardless. Clicking
-a live checkbox calls `LadderLabeler.toggleAucInclude(id, z)`, which
-mutates `L.excludedZ`, re-sums `aucSum` from stored per-rung AUCs,
-re-runs `recomputeAbundances`, and triggers the same panel-and-plot
-re-render path the existing edit buttons use.
+- `✓` chip (light blue) — rung is snapped and included in AUC. Clicking
+  excludes it.
+- `✗` chip (light red) — rung is snapped but excluded. Clicking re-includes.
+- `—` chip (gray, disabled) — rung is unsnapped or stale. Not clickable.
 
-No other rung-row column changes.
+Live-chip clicks call `LadderLabeler.toggleAucInclude(id, z)`. The chip
+row is rebuilt by `renderLadderPanel()` on each labeler state change.
+Chips are rendered inline (no separate CSS rule) inside `chipsFor(L)`,
+which sorts labels by descending z so chips read 7+, 6+, 5+, ….
 
 ### 5.4 Plot click shortcut
 
