@@ -915,6 +915,9 @@ function recompute(){
  // (spec §5.2, §5.4). When disabled, this returns empty arrays so the
  // existing MS1 layout is bit-identical to before.
  if (typeof LadderLabeler !== 'undefined') {
+   // Sync the LCR scale/threshold so AUC integrates the unscaled signal.
+   LadderLabeler.state.threshold = scaleOn ? thr : Infinity;
+   LadderLabeler.state.scale = scaleOn ? factor : 1;
    LadderLabeler.refreshAll(PROC_X, PROC_Y);
    const g = LadderLabeler.buildAnnotations(PROC_X, PROC_Y);
    layout.shapes = (layout.shapes || []).concat(g.shapes);
