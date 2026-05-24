@@ -23,6 +23,15 @@ const LadderLabelerCore = (function () {
     return (M + z * M_H) / z;
   }
 
+  // Unscale: divide y by scale when m/z is at or above the LCR scaling
+  // threshold; otherwise return y unchanged. scale=1 (or 0, defensive)
+  // is a no-op everywhere. Used so AUC integrates the pre-LCR-scale
+  // signal regardless of whether the user has scaling toggled on.
+  function unscaleY(mz, y, threshold, scale) {
+    if (mz >= threshold && scale > 1) return y / scale;
+    return y;
+  }
+
   // Closed-form charge recovery from any two ladder rungs (positive mode).
   // Multi-k sweep handles non-adjacent picks: when gcd(z₁, k) = 1, only the
   // correct k yields an integer-close result. When gcd(z₁, k) > 1 (e.g.,
@@ -101,7 +110,7 @@ const LadderLabelerCore = (function () {
     return '± ' + (rel * 100).toFixed(1) + '%';
   }
 
-  return { M_H, computeM, predictRung, solveFromTwoClicks,
+  return { M_H, computeM, predictRung, unscaleY, solveFromTwoClicks,
            snapToMaxInWindow, _stdDev, formatMass, formatSigma };
 })();
 

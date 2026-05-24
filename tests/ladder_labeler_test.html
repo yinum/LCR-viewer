@@ -385,6 +385,20 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('ladder B annotations use a different ay offset than ladder A',
           bRungs[0].ay !== aRungs[0].ay);
 
+    // ---------- New: unscaleY ----------
+    const UNS = LadderLabelerCore.unscaleY;
+    check('unscaleY above threshold with scale=4 returns y/4',
+          near(UNS(7000, 100, 6500, 4), 25, 1e-9),
+          'got ' + UNS(7000, 100, 6500, 4));
+    check('unscaleY below threshold returns y unchanged',
+          UNS(3000, 100, 6500, 4) === 100);
+    check('unscaleY at threshold uses the scaled branch (>= comparison)',
+          near(UNS(6500, 100, 6500, 4), 25, 1e-9));
+    check('unscaleY with scale=1 is a no-op everywhere',
+          UNS(7000, 100, 6500, 1) === 100 && UNS(3000, 100, 6500, 1) === 100);
+    check('unscaleY with scale=0 is a no-op (defensive)',
+          UNS(7000, 100, 6500, 0) === 100);
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();
