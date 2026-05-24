@@ -306,6 +306,17 @@ const LadderLabeler = (function () {
       lb.mzObs === null || lb.stale || L.excludedZ.has(lb.z));
   }
 
+  // Cross-ladder normalization. Assigns L.abundance = L.aucSum / total
+  // for each ladder. total === 0 → all abundance = null. Cheap; runs
+  // once after any per-ladder aucSum change.
+  function recomputeAbundances() {
+    let total = 0;
+    for (const L of state.ladders) total += (L.aucSum || 0);
+    for (const L of state.ladders) {
+      L.abundance = (total > 0) ? ((L.aucSum || 0) / total) : null;
+    }
+  }
+
   function addLadderFromTwoClicks(m1, m2, specX, specY) {
     const sol = C.solveFromTwoClicks(m1, m2);
     if (sol === null) {
@@ -500,6 +511,7 @@ const LadderLabeler = (function () {
     refreshLadder,
     refreshAll,
     computeLadderAuc,
+    recomputeAbundances,
     buildAnnotations,
     handlePlotClick,
   };

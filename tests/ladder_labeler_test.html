@@ -554,6 +554,49 @@ if (typeof LadderLabelerCore === 'undefined') {
     LadderLabeler.state.threshold = Infinity;
     LadderLabeler.state.scale = 1;
 
+    // ---------- New: recomputeAbundances ----------
+    resetLabelerState();
+    // Two synthetic ladders, manually constructed with known aucSum (no
+    // computeLadderAuc call — we just want to verify the cross-ladder math).
+    LadderLabeler.state.ladders.push({
+      id: 'A', color: '#1f77b4', seed: { mz: 1000, z: 5 }, M: 5000, sigmaM: 0,
+      labels: [], excludedZ: new Set(),
+      aucSum: 75, isPartial: false, abundance: null,
+    });
+    LadderLabeler.state.ladders.push({
+      id: 'B', color: '#ff7f0e', seed: { mz: 1500, z: 4 }, M: 6000, sigmaM: 0,
+      labels: [], excludedZ: new Set(),
+      aucSum: 25, isPartial: false, abundance: null,
+    });
+    LadderLabeler.recomputeAbundances();
+    check('recomputeAbundances 3:1 → 0.75/0.25',
+          near(LadderLabeler.state.ladders[0].abundance, 0.75, 1e-9)
+          && near(LadderLabeler.state.ladders[1].abundance, 0.25, 1e-9),
+          'A=' + LadderLabeler.state.ladders[0].abundance
+          + ' B=' + LadderLabeler.state.ladders[1].abundance);
+
+    LadderLabeler.state.ladders[0].aucSum = 0;
+    LadderLabeler.state.ladders[1].aucSum = 0;
+    LadderLabeler.recomputeAbundances();
+    check('recomputeAbundances with total=0 → all abundance=null',
+          LadderLabeler.state.ladders[0].abundance === null
+          && LadderLabeler.state.ladders[1].abundance === null);
+
+    LadderLabeler.state.ladders.length = 1;
+    LadderLabeler.state.ladders[0].aucSum = 42;
+    LadderLabeler.recomputeAbundances();
+    check('recomputeAbundances single ladder → abundance=1.0',
+          LadderLabeler.state.ladders[0].abundance === 1.0);
+
+    // No ladders at all → no crash.
+    LadderLabeler.state.ladders.length = 0;
+    try {
+      LadderLabeler.recomputeAbundances();
+      check('recomputeAbundances with no ladders does not throw', true);
+    } catch (e) {
+      check('recomputeAbundances with no ladders does not throw', false, e.message);
+    }
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();
