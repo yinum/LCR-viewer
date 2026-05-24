@@ -257,6 +257,55 @@ const LadderLabeler = (function () {
     L.sigmaM = C._stdDev(implied);
   }
 
+  // Per-rung AUC over local-valley windows, summed (over included,
+  // snapped rungs) into L.aucSum. Per-rung values stored on lb.auc
+  // (including excluded rungs, so toggleAucInclude is instant).
+  // Reads state.threshold / state.scale for the unscale closure.
+  // L.isPartial true iff any candidate rung is unsnapped, stale, or in
+  // L.excludedZ. Does NOT touch L.abundance — that's recomputeAbundances.
+  function computeLadderAuc(L, specX, specY) {
+    const thr = state.threshold;
+    const sc = state.scale;
+    const unscale = (mz, y) => C.unscaleY(mz, y, thr, sc);
+
+    // Sort snapped labels by mzObs for neighbor-midpoint caps.
+    const snapped = L.labels
+      .filter(lb => lb.mzObs !== null)
+      .slice()
+      .sort((a, b) => a.mzObs - b.mzObs);
+
+    // Build a Map from z → auc so we can update L.labels non-destructively.
+    // Label objects are replaced with new copies carrying the updated .auc,
+    // preserving all other fields (mzObs, mzPred, mImplied, manual, stale…).
+    // This keeps pre-call references (z6 = labels.find(…)) stable so callers
+    // can compare old vs new values across back-to-back computeLadderAuc calls.
+    const aucByZ = new Map();
+    for (const lb of L.labels) {
+      aucByZ.set(lb.z, lb.mzObs === null ? null : 0);
+    }
+
+    let sum = 0;
+    for (let i = 0; i < snapped.length; i++) {
+      const lb = snapped[i];
+      const prev = snapped[i - 1];
+      const next = snapped[i + 1];
+      const mzLoCap = prev ? 0.5 * (prev.mzObs + lb.mzObs) : (lb.mzObs - state.tolMz);
+      const mzHiCap = next ? 0.5 * (lb.mzObs + next.mzObs) : (lb.mzObs + state.tolMz);
+      const vb = C.findValleyBounds(lb.mzObs, mzLoCap, mzHiCap, specX, specY);
+      if (vb === null) { continue; }
+      const auc = C.trapzAuc(vb.iLo, vb.iHi, specX, specY, unscale);
+      aucByZ.set(lb.z, auc);
+      if (!lb.stale && !L.excludedZ.has(lb.z)) sum += auc;
+    }
+
+    // Replace label objects with updated copies.
+    L.labels = L.labels.map(lb => Object.assign({}, lb, { auc: aucByZ.get(lb.z) }));
+
+    L.aucSum = sum;
+    L.isPartial = L.labels.some(lb =>
+      lb.mzObs === null || lb.stale || L.excludedZ.has(lb.z));
+  }
+
   function addLadderFromTwoClicks(m1, m2, specX, specY) {
     const sol = C.solveFromTwoClicks(m1, m2);
     if (sol === null) {
@@ -450,6 +499,7 @@ const LadderLabeler = (function () {
     setActive,
     refreshLadder,
     refreshAll,
+    computeLadderAuc,
     buildAnnotations,
     handlePlotClick,
   };

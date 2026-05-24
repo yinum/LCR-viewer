@@ -468,6 +468,92 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('new ladder has empty L.excludedZ Set',
           Le.excludedZ instanceof Set && Le.excludedZ.size === 0);
 
+    // ---------- New: computeLadderAuc ----------
+    // 3-rung ladder: peaks of equal Gaussian width at z=7,6,5 of M=26391.94.
+    // We construct the spectrum so the integrated AUCs are in ratio 1:2:1
+    // by giving the middle peak amplitude 2 and the others amplitude 1.
+    function makeRatioSpectrum() {
+      const X = [], Y = [];
+      // z=7 → m/z=3771.28, z=6 → m/z=4399.66, z=5 → m/z=5279.40
+      const peaks = [
+        { mz: 3771.28, amp: 1 },
+        { mz: 4399.66, amp: 2 },
+        { mz: 5279.40, amp: 1 },
+      ];
+      for (let mz = 3500; mz <= 5800; mz += 0.5) {
+        X.push(mz);
+        let y = 0;
+        for (const p of peaks) y += p.amp * Math.exp(-Math.pow((mz - p.mz) / 2.0, 2));
+        Y.push(y);
+      }
+      return { X, Y };
+    }
+
+    resetLabelerState();
+    const specR = makeRatioSpectrum();
+    LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, specR.X, specR.Y);
+    const Lr = LadderLabeler.state.ladders[0];
+    LadderLabeler.computeLadderAuc(Lr, specR.X, specR.Y);
+
+    const z7 = Lr.labels.find(lb => lb.z === 7);
+    const z6 = Lr.labels.find(lb => lb.z === 6);
+    const z5 = Lr.labels.find(lb => lb.z === 5);
+    check('computeLadderAuc assigns lb.auc on snapped rungs',
+          typeof z7.auc === 'number' && z7.auc > 0
+          && typeof z6.auc === 'number' && z6.auc > 0
+          && typeof z5.auc === 'number' && z5.auc > 0);
+    check('per-rung AUC ratio is approximately 1:2:1',
+          near(z6.auc / z7.auc, 2.0, 0.05) && near(z6.auc / z5.auc, 2.0, 0.05),
+          'z7=' + z7.auc + ' z6=' + z6.auc + ' z5=' + z5.auc);
+
+    // L.aucSum must equal the sum of lb.auc over snapped, non-stale,
+    // non-excluded rungs. With an empty excludedZ and no stale rungs,
+    // this is the sum over all snapped labels.
+    const expectedSum = Lr.labels
+      .filter(lb => lb.mzObs !== null && !lb.stale && !Lr.excludedZ.has(lb.z))
+      .reduce((s, lb) => s + lb.auc, 0);
+    check('L.aucSum equals the sum of included rung AUCs',
+          near(Lr.aucSum, expectedSum, 1e-6),
+          'aucSum=' + Lr.aucSum + ' expected=' + expectedSum);
+
+    // makeRatioSpectrum covers 3500..5800 m/z. The standard ladder predicts
+    // rungs at z=7..1 of M≈26392. Rungs above z=5 fall outside the spectrum
+    // and are therefore unsnapped → isPartial must be true.
+    check('isPartial=true when some candidate rung is unsnapped',
+          Lr.isPartial === true);
+
+    // Exclude z=6 → aucSum drops by exactly z6.auc and isPartial stays true.
+    const sumWithAll = Lr.aucSum;
+    Lr.excludedZ.add(6);
+    LadderLabeler.computeLadderAuc(Lr, specR.X, specR.Y);
+    check('excluding a rung drops aucSum by exactly that rung auc',
+          near(Lr.aucSum, sumWithAll - z6.auc, 1e-6),
+          'sumWithAll=' + sumWithAll + ' aucSum=' + Lr.aucSum + ' z6.auc=' + z6.auc);
+    check('excluding a rung sets isPartial=true',
+          Lr.isPartial === true);
+
+    Lr.excludedZ.delete(6);
+    LadderLabeler.computeLadderAuc(Lr, specR.X, specR.Y);
+    check('un-excluding restores aucSum',
+          near(Lr.aucSum, sumWithAll, 1e-6));
+
+    // Unscaling: above threshold the integration uses y/scale.
+    LadderLabeler.state.threshold = 4000;
+    LadderLabeler.state.scale = 2;
+    LadderLabeler.computeLadderAuc(Lr, specR.X, specR.Y);
+    // z=7 (m/z≈3771) is below threshold → auc unchanged.
+    // z=6 (m/z≈4400) and z=5 (m/z≈5279) are above → auc halved.
+    const z7_a = Lr.labels.find(lb => lb.z === 7).auc;
+    const z6_a = Lr.labels.find(lb => lb.z === 6).auc;
+    check('unscale leaves below-threshold AUC unchanged',
+          near(z7_a, z7.auc, 1e-6));
+    check('unscale halves above-threshold AUC',
+          near(z6_a, z6.auc / 2, 1e-3),
+          'z6.auc=' + z6.auc + ' halved=' + (z6.auc / 2) + ' got=' + z6_a);
+    // Reset state so later tests are not affected.
+    LadderLabeler.state.threshold = Infinity;
+    LadderLabeler.state.scale = 1;
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();
