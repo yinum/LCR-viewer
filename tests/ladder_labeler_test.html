@@ -626,6 +626,50 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('removing a ladder rebalances remaining abundance to 1.0',
           LadderLabeler.state.ladders[0].abundance === 1.0);
 
+    // ---------- New: toggleAucInclude ----------
+    resetLabelerState();
+    const specT = makeLadderSpectrum();
+    LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, specT.X, specT.Y);
+    let Lt = LadderLabeler.state.ladders[0];
+    const sumFull = Lt.aucSum;
+    // Capture z=6's auc as a primitive (computeLadderAuc replaces label
+    // objects, so a captured reference's .auc is a snapshot anyway, but
+    // a primitive is clearer for the test's intent).
+    const z6auc = Lt.labels.find(lb => lb.z === 6).auc;
+
+    const rToggle1 = LadderLabeler.toggleAucInclude('A', 6);
+    check('toggleAucInclude returns {id, z, included:false} on exclude',
+          rToggle1 && rToggle1.id === 'A' && rToggle1.z === 6 && rToggle1.included === false,
+          JSON.stringify(rToggle1));
+    Lt = LadderLabeler.state.ladders[0];
+    check('toggleAucInclude exclude drops aucSum by exactly the rung auc',
+          near(Lt.aucSum, sumFull - z6auc, 1e-6),
+          'sumFull=' + sumFull + ' aucSum=' + Lt.aucSum + ' z6auc=' + z6auc);
+    check('toggleAucInclude exclude sets isPartial=true',
+          Lt.isPartial === true);
+
+    const rToggle2 = LadderLabeler.toggleAucInclude('A', 6);
+    Lt = LadderLabeler.state.ladders[0];
+    check('toggleAucInclude returns {included:true} on re-include',
+          rToggle2 && rToggle2.included === true);
+    check('toggleAucInclude re-include restores aucSum',
+          near(Lt.aucSum, sumFull, 1e-6));
+
+    // excludedZ survives refreshLadder
+    LadderLabeler.toggleAucInclude('A', 6);  // exclude again
+    Lt = LadderLabeler.state.ladders[0];
+    const sumAfterExclude = Lt.aucSum;
+    LadderLabeler.refreshLadder('A', specT.X, specT.Y);
+    Lt = LadderLabeler.state.ladders[0];
+    check('excludedZ survives refreshLadder',
+          Lt.excludedZ.has(6) && near(Lt.aucSum, sumAfterExclude, 1e-6));
+
+    // Unknown ladder id is a no-op (returns null).
+    const rToggle3 = LadderLabeler.toggleAucInclude('ZZZ', 6);
+    check('toggleAucInclude on unknown id returns null',
+          rToggle3 === null,
+          JSON.stringify(rToggle3));
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();

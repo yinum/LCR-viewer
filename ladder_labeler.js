@@ -319,6 +319,30 @@ const LadderLabeler = (function () {
     }
   }
 
+  // Toggle whether the rung at z is included in L.aucSum. Re-sums from
+  // stored per-rung lb.auc values — no re-integration. Triggers
+  // recomputeAbundances() so cross-ladder fractions stay consistent.
+  // Returns { id, z, included } so the caller can update its UI; null
+  // if the ladder id is unknown.
+  function toggleAucInclude(id, z) {
+    const L = state.ladders.find(x => x.id === id);
+    if (!L) return null;
+    if (L.excludedZ.has(z)) L.excludedZ.delete(z);
+    else L.excludedZ.add(z);
+    // Re-sum from stored auc values.
+    let sum = 0;
+    for (const lb of L.labels) {
+      if (lb.mzObs === null || lb.stale) continue;
+      if (L.excludedZ.has(lb.z)) continue;
+      sum += (lb.auc || 0);
+    }
+    L.aucSum = sum;
+    L.isPartial = L.labels.some(lb =>
+      lb.mzObs === null || lb.stale || L.excludedZ.has(lb.z));
+    recomputeAbundances();
+    return { id, z, included: !L.excludedZ.has(z) };
+  }
+
   function addLadderFromTwoClicks(m1, m2, specX, specY) {
     const sol = C.solveFromTwoClicks(m1, m2);
     if (sol === null) {
@@ -515,6 +539,7 @@ const LadderLabeler = (function () {
     refreshAll,
     computeLadderAuc,
     recomputeAbundances,
+    toggleAucInclude,
     buildAnnotations,
     handlePlotClick,
   };
