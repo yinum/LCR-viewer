@@ -473,10 +473,14 @@ const LadderLabeler = (function () {
           const ans = prompt(
             'Edit label at m/z=' + lb.mzObs.toFixed(2) + ' (ladder ' + L.id + ').\n'
             + 'Enter integer to override z, integer+s to set as new seed,'
-            + ' empty to delete.', String(lb.z));
+            + ' x to toggle AUC include, empty to delete.', String(lb.z));
           if (ans === null) return;     // user cancelled
           if (ans === '') {
             L.labels = L.labels.filter(x => x !== lb);
+            return;
+          }
+          if (/^x$/i.test(ans)) {
+            toggleAucInclude(L.id, lb.z);
             return;
           }
           const seedFlag = /s$/i.test(ans);

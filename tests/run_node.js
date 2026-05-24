@@ -75,6 +75,14 @@ const sandbox = {
 };
 sandbox.global = sandbox;
 
+// Make global prompt delegate to window.prompt (in browsers they're the same).
+// When test code does window.prompt = ..., the global prompt must also change.
+Object.defineProperty(sandbox, 'prompt', {
+  get() { return fakeWindow.prompt; },
+  set(fn) { fakeWindow.prompt = fn; },
+  configurable: true,
+});
+
 vm.createContext(sandbox);
 
 try {

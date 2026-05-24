@@ -670,6 +670,26 @@ if (typeof LadderLabelerCore === 'undefined') {
           rToggle3 === null,
           JSON.stringify(rToggle3));
 
+    // ---------- New: handlePlotClick 'x' toggles excludedZ ----------
+    resetLabelerState();
+    LadderLabeler.state.enabled = true;
+    const specC = makeLadderSpectrum();
+    LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, specC.X, specC.Y);
+    LadderLabeler.setActive('A');
+    // Stub window.prompt to return 'x' once.
+    const _origPrompt = window.prompt;
+    let promptCalled = 0;
+    window.prompt = () => { promptCalled++; return 'x'; };
+    // Click near the z=6 rung (predicted m/z ≈ 4399.66).
+    LadderLabeler.handlePlotClick(4400, specC.X, specC.Y);
+    window.prompt = _origPrompt;
+    check('handlePlotClick x prompt was issued once',
+          promptCalled === 1);
+    const Lc = LadderLabeler.state.ladders[0];
+    check('handlePlotClick x adds z=6 to excludedZ',
+          Lc.excludedZ.has(6),
+          'excludedZ=' + JSON.stringify([...Lc.excludedZ]));
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();
