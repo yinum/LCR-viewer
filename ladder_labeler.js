@@ -32,6 +32,38 @@ const LadderLabelerCore = (function () {
     return y;
   }
 
+  // Walk left and right from the sample nearest mzObs, stopping at the
+  // first local minimum (point where intensity starts rising again) or
+  // when m/z crosses the supplied cap. Returns inclusive index bounds
+  // {iLo, iHi}, or null on an empty spectrum.
+  // Assumes specX is ascending.
+  function findValleyBounds(mzObs, mzLoCap, mzHiCap, specX, specY) {
+    const n = specX.length;
+    if (n === 0) return null;
+    // Binary search for the sample nearest mzObs.
+    let lo = 0, hi = n - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (specX[mid] < mzObs) lo = mid + 1; else hi = mid;
+    }
+    let i = lo;
+    if (i > 0 && Math.abs(specX[i - 1] - mzObs) < Math.abs(specX[i] - mzObs)) {
+      i = i - 1;
+    }
+    // Walk left: stop when next-left value is higher (we are rising again)
+    // or m/z dips below mzLoCap.
+    let iLo = i;
+    while (iLo > 0 && specX[iLo - 1] >= mzLoCap && specY[iLo - 1] <= specY[iLo]) {
+      iLo--;
+    }
+    // Walk right: mirror.
+    let iHi = i;
+    while (iHi < n - 1 && specX[iHi + 1] <= mzHiCap && specY[iHi + 1] <= specY[iHi]) {
+      iHi++;
+    }
+    return { iLo, iHi };
+  }
+
   // Closed-form charge recovery from any two ladder rungs (positive mode).
   // Multi-k sweep handles non-adjacent picks: when gcd(z₁, k) = 1, only the
   // correct k yields an integer-close result. When gcd(z₁, k) > 1 (e.g.,
@@ -111,7 +143,7 @@ const LadderLabelerCore = (function () {
   }
 
   return { M_H, computeM, predictRung, unscaleY, solveFromTwoClicks,
-           snapToMaxInWindow, _stdDev, formatMass, formatSigma };
+           snapToMaxInWindow, findValleyBounds, _stdDev, formatMass, formatSigma };
 })();
 
 // ============================================================================

@@ -399,6 +399,39 @@ if (typeof LadderLabelerCore === 'undefined') {
     check('unscaleY with scale=0 is a no-op (defensive)',
           UNS(7000, 100, 6500, 0) === 100);
 
+    // ---------- New: findValleyBounds ----------
+    const FVB = LadderLabelerCore.findValleyBounds;
+    // Three-peak intensity array with valleys between them.
+    // Indices:  0   1   2   3   4   5   6   7   8   9  10
+    // y:        1   3   5   3   1   4   6   4   1   3   5
+    //         peak1 apex=2, valley=4, peak2 apex=6, valley=8, peak3 apex=10
+    const vX = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    const vY = [ 1,  3,  5,  3,  1,  4,  6,  4,  1,  3,  5];
+
+    let vb = FVB(12, 10, 20, vX, vY);  // start at peak1 (idx 2)
+    check('findValleyBounds at peak1 finds valleys [0, 4]',
+          vb && vb.iLo === 0 && vb.iHi === 4,
+          JSON.stringify(vb));
+
+    vb = FVB(16, 10, 20, vX, vY);  // start at peak2 (idx 6)
+    check('findValleyBounds at peak2 walks until valleys on both sides',
+          vb && vb.iLo === 4 && vb.iHi === 8,
+          JSON.stringify(vb));
+
+    vb = FVB(16, 14.5, 17.5, vX, vY);  // tight cap
+    check('findValleyBounds respects mzLoCap and mzHiCap',
+          vb && vX[vb.iLo] >= 14.5 && vX[vb.iHi] <= 17.5,
+          JSON.stringify(vb));
+
+    check('findValleyBounds on empty spectrum returns null',
+          FVB(100, 0, 200, [], []) === null);
+
+    // mzObs falling between samples — uses nearest index
+    vb = FVB(15.6, 10, 20, vX, vY);  // nearest is idx 6 (value 16)
+    check('findValleyBounds snaps to nearest sample when mzObs is between',
+          vb && vb.iLo === 4 && vb.iHi === 8,
+          JSON.stringify(vb));
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();
