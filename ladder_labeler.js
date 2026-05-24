@@ -255,6 +255,8 @@ const LadderLabeler = (function () {
       .filter(lb => lb.mImplied !== null && !lb.manual)
       .map(lb => lb.mImplied);
     L.sigmaM = C._stdDev(implied);
+    computeLadderAuc(L, specX, specY);
+    recomputeAbundances();
   }
 
   // Per-rung AUC over local-valley windows, summed (over included,
@@ -333,6 +335,7 @@ const LadderLabeler = (function () {
     if (state.activeLadderId === id) {
       state.activeLadderId = state.ladders.length ? state.ladders[0].id : null;
     }
+    recomputeAbundances();
   }
 
   function setActive(id) {

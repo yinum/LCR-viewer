@@ -597,6 +597,35 @@ if (typeof LadderLabelerCore === 'undefined') {
       check('recomputeAbundances with no ladders does not throw', false, e.message);
     }
 
+    // ---------- New: refreshLadder / removeLadder wiring ----------
+    resetLabelerState();
+    const specW = makeLadderSpectrum();
+    LadderLabeler.addLadderFromSeed({ mz: 3300, z: 8 }, specW.X, specW.Y);
+    check('addLadderFromSeed populates aucSum > 0 via refreshLadder',
+          LadderLabeler.state.ladders[0].aucSum > 0,
+          'aucSum=' + LadderLabeler.state.ladders[0].aucSum);
+    check('single ladder gets abundance=1.0 after add',
+          LadderLabeler.state.ladders[0].abundance === 1.0);
+
+    // Add a 2nd ladder; both ladders' abundances must split.
+    addSecondLadderPeaks(specW.X, specW.Y);
+    LadderLabeler.addLadderFromSeed({ mz: 3302.5, z: 16 }, specW.X, specW.Y);
+    // Re-snap A on the updated spectrum so its AUC reflects the new peaks
+    // (addSecondLadderPeaks mutates specW.Y in place).
+    LadderLabeler.refreshLadder('A', specW.X, specW.Y);
+    check('adding a 2nd ladder drops first ladder abundance below 1.0',
+          LadderLabeler.state.ladders[0].abundance < 1.0
+          && LadderLabeler.state.ladders[0].abundance > 0,
+          'A.abundance=' + LadderLabeler.state.ladders[0].abundance);
+    check('two ladders abundance sums to 1.0',
+          near(LadderLabeler.state.ladders[0].abundance
+               + LadderLabeler.state.ladders[1].abundance, 1.0, 1e-9));
+
+    // Remove ladder B → A's abundance returns to 1.0.
+    LadderLabeler.removeLadder('B');
+    check('removing a ladder rebalances remaining abundance to 1.0',
+          LadderLabeler.state.ladders[0].abundance === 1.0);
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();
