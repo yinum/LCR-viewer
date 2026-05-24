@@ -432,6 +432,27 @@ if (typeof LadderLabelerCore === 'undefined') {
           vb && vb.iLo === 4 && vb.iHi === 8,
           JSON.stringify(vb));
 
+    // ---------- New: trapzAuc ----------
+    const TRZ = LadderLabelerCore.trapzAuc;
+    const noUnscale = (mz, y) => y;
+
+    // Triangle from (0,0) to (5,10) to (10,0) — closed-form area = 50.
+    const trX = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const trY = [0, 2, 4, 6, 8, 10, 8, 6, 4, 2, 0];
+    check('trapzAuc of a triangle matches closed-form 50',
+          near(TRZ(0, 10, trX, trY, noUnscale), 50, 1e-9),
+          'got ' + TRZ(0, 10, trX, trY, noUnscale));
+
+    // Same triangle, with an unscale halving samples above mz=5
+    const halfAbove5 = (mz, y) => (mz >= 5 ? y / 2 : y);
+    // Left half (i=0..4, area ≈ 22.5) + right half (i=5..9, area ≈ 12.5) = 35
+    check('trapzAuc with unscale halving above threshold returns 35',
+          near(TRZ(0, 10, trX, trY, halfAbove5), 35, 1e-9),
+          'got ' + TRZ(0, 10, trX, trY, halfAbove5));
+
+    check('trapzAuc with iLo === iHi returns 0',
+          TRZ(5, 5, trX, trY, noUnscale) === 0);
+
     // ---------- Task 13 tests: handlePlotClick (non-prompt paths) ----------
     resetLabelerState();
     const spec4 = makeLadderSpectrum();

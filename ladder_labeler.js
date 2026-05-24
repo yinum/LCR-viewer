@@ -64,6 +64,19 @@ const LadderLabelerCore = (function () {
     return { iLo, iHi };
   }
 
+  // Trapezoidal integration of (specX, unscale(specX, specY)) over the
+  // inclusive index range [iLo, iHi]. unscale(mz, y) is a closure (use
+  // (_, y) => y for no unscale). Returns 0 if iLo === iHi.
+  function trapzAuc(iLo, iHi, specX, specY, unscale) {
+    let sum = 0;
+    for (let i = iLo; i < iHi; i++) {
+      const y0 = unscale(specX[i],     specY[i]);
+      const y1 = unscale(specX[i + 1], specY[i + 1]);
+      sum += 0.5 * (y0 + y1) * (specX[i + 1] - specX[i]);
+    }
+    return sum;
+  }
+
   // Closed-form charge recovery from any two ladder rungs (positive mode).
   // Multi-k sweep handles non-adjacent picks: when gcd(z₁, k) = 1, only the
   // correct k yields an integer-close result. When gcd(z₁, k) > 1 (e.g.,
@@ -143,7 +156,8 @@ const LadderLabelerCore = (function () {
   }
 
   return { M_H, computeM, predictRung, unscaleY, solveFromTwoClicks,
-           snapToMaxInWindow, findValleyBounds, _stdDev, formatMass, formatSigma };
+           snapToMaxInWindow, findValleyBounds, trapzAuc,
+           _stdDev, formatMass, formatSigma };
 })();
 
 // ============================================================================
