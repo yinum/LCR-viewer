@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>uploader.js tests</title>
+<script src="../uploader.js"></script>
+<script>
+const summary = document.createElement('div'); summary.id = 'summary';
+const log = document.createElement('div'); log.id = 'log';
+document.body && document.body.append(summary, log);
+
+let passed = 0, failed = 0;
+function check(name, cond, detail) {
+  const pre = document.createElement('pre');
+  if (cond) { passed++; pre.className='pass'; pre.textContent = 'PASS  ' + name; }
+  else { failed++; pre.className='fail';
+         pre.textContent = 'FAIL  ' + name + (detail?': '+detail:''); }
+  (document.getElementById('log') || log).appendChild(pre);
+}
+
+try {
+  // --- parseSpectrum ---
+  check('parseSpectrum: whitespace 2-col', (() => {
+    const s = LCRUploader.parseSpectrum('100 1\n200 2\n300 3\n');
+    return s.ok && s.mz.length === 3 && s.mz[1] === 200 && s.intensity[1] === 2;
+  })());
+
+  check('parseSpectrum: comma-delimited', (() => {
+    const s = LCRUploader.parseSpectrum('100,1\n200,2\n');
+    return s.ok && s.mz.length === 2 && s.intensity[1] === 2;
+  })());
+
+  check('parseSpectrum: tab-delimited', (() => {
+    const s = LCRUploader.parseSpectrum('100\t1\n200\t2\n');
+    return s.ok && s.mz.length === 2;
+  })());
+
+  check('parseSpectrum: skips header lines until numeric start', (() => {
+    const s = LCRUploader.parseSpectrum('# header\nm/z intensity\n100 1\n200 2\n');
+    return s.ok && s.mz.length === 2 && s.mz[0] === 100;
+  })());
+
+  check('parseSpectrum: empty file → error', (() => {
+    const s = LCRUploader.parseSpectrum('');
+    return !s.ok && /empty/i.test(s.message);
+  })());
+
+  check('parseSpectrum: junk-only → error', (() => {
+    const s = LCRUploader.parseSpectrum('hello world\nfoo bar\n');
+    return !s.ok && /couldn'?t read/i.test(s.message);
+  })());
+
+  check('parseSpectrum: stops on mid-stream bad line', (() => {
+    const s = LCRUploader.parseSpectrum('100 1\n200 2\noops 3 4 5\n');
+    return !s.ok && /line 3/i.test(s.message);
+  })());
+
+  // --- precursorFromName ---
+  check('precursorFromName: trailing integer', () =>
+    LCRUploader.precursorFromName('PF4_polyP_3300.xy') === 3300);
+  check('precursorFromName: trailing decimal', () =>
+    LCRUploader.precursorFromName('polyP_3300.5.xy') === 3300.5);
+  check('precursorFromName: leading number ignored', () =>
+    LCRUploader.precursorFromName('3300_PF4_polyP.xy') === null);
+  check('precursorFromName: no number', () =>
+    LCRUploader.precursorFromName('polyP_no_number.xy') === null);
+} catch (e) {
+  check('exception during test run', false, e.message + '\n' + e.stack);
+}
+
+summary.textContent = `${passed} passed, ${failed} failed.`;
+summary.className = failed === 0 ? 'pass' : 'fail';
+</script>

@@ -48,6 +48,7 @@ const inlineScript = inlineMatch[1];
 function makeFakeEl(tag) {
   return {
     tagName: tag,
+    id: '',
     className: '',
     textContent: '',
     children: [],
@@ -56,14 +57,24 @@ function makeFakeEl(tag) {
 }
 const summary = makeFakeEl('div');
 const log = makeFakeEl('div');
+summary.id = 'summary';
+log.id = 'log';
+
+// Registry maps id → element so test-created elements with well-known ids
+// (summary, log) shadow the defaults once appended to document.body.
+const registry = { summary, log };
 
 const fakeDoc = {
-  getElementById(id) {
-    if (id === 'summary') return summary;
-    if (id === 'log') return log;
-    return null;
-  },
+  getElementById(id) { return registry[id] || null; },
   createElement(tag) { return makeFakeEl(tag); },
+  // body.append() registers elements by their id for getElementById lookup.
+  body: {
+    append(...els) {
+      for (const el of els) {
+        if (el && el.id) registry[el.id] = el;
+      }
+    },
+  },
 };
 
 const fakeWindow = {
@@ -71,17 +82,19 @@ const fakeWindow = {
 };
 
 // Build a sandbox and run the module(s) + the inline test script.
+// `window` points at the sandbox itself (mirroring browser globalThis === window)
+// so that modules which export via `root.LCRUploader = ...` on `window` make
+// their symbols visible as bare globals in subsequent scripts.
 const sandbox = {
   document: fakeDoc,
-  window: fakeWindow,
   console,
-  // Map a top-level `window.prompt = …` assignment in test code to fakeWindow.
-  // (vm scripts see top-level `window` as an alias for our sandbox's window.)
   Math, Number, JSON, Array, Set, Map, Date, Symbol, Infinity, NaN,
 };
 sandbox.global = sandbox;
+// window === sandbox (as in a real browser); set after object creation.
+sandbox.window = sandbox;
 
-// Make global prompt delegate to window.prompt (in browsers they're the same).
+// Make global prompt delegate to fakeWindow.prompt (in browsers they're the same).
 // When test code does window.prompt = ..., the global prompt must also change.
 Object.defineProperty(sandbox, 'prompt', {
   get() { return fakeWindow.prompt; },
@@ -108,9 +121,12 @@ try {
 }
 
 // Replay the log for visibility (one line per check).
-for (const c of log.children) {
+// Use registry lookups in case the test page replaced the default elements.
+const finalLog = registry['log'];
+const finalSummary = registry['summary'];
+for (const c of finalLog.children) {
   console.log(c.textContent);
 }
 console.log('---');
-console.log(summary.textContent);
-process.exit(summary.textContent.includes(' 0 failed.') ? 0 : 1);
+console.log(finalSummary.textContent);
+process.exit(finalSummary.textContent.includes(' 0 failed.') ? 0 : 1);
