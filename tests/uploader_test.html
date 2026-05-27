@@ -141,6 +141,34 @@ try {
         typeof LCRUploader.buildAllCsvsZip === 'function');
   check('refreshBulkBtn exported',
         typeof LCRUploader.refreshBulkBtn === 'function');
+
+  // --- ingestPastedText ---
+  check('ingestPastedText: ok path adds entry with .xy extension default', (() => {
+    const s = LCRUploader.createStore();
+    const r = LCRUploader.ingestPastedText('100 1\n200 2\n', '', s, null);
+    const all = s.all();
+    return r.ok && all.length === 1 && /^pasted_.*\.xy$/.test(all[0].name);
+  })());
+  check('ingestPastedText: appends .xy when name has no extension', (() => {
+    const s = LCRUploader.createStore();
+    LCRUploader.ingestPastedText('100 1\n200 2\n', 'mysample_3300', s, null);
+    return s.all()[0].name === 'mysample_3300.xy';
+  })());
+  check('ingestPastedText: keeps explicit .csv extension', (() => {
+    const s = LCRUploader.createStore();
+    LCRUploader.ingestPastedText('100 1\n200 2\n', 'mysample.csv', s, null);
+    return s.all()[0].name === 'mysample.csv';
+  })());
+  check('ingestPastedText: precursor read from trailing number in name', (() => {
+    const s = LCRUploader.createStore();
+    LCRUploader.ingestPastedText('100 1\n200 2\n', 'mysample_3300', s, null);
+    return s.all()[0].precursor === 3300;
+  })());
+  check('ingestPastedText: parse error returns {ok:false}', (() => {
+    const s = LCRUploader.createStore();
+    const r = LCRUploader.ingestPastedText('not a spectrum', '', s, null);
+    return r.ok === false && s.all().length === 0 && /\w+/.test(r.message);
+  })());
   // --- error panel (DOM stubs in Node) ---
   if (typeof document !== 'undefined') {
     // Provide the panel + body elements the function looks for via getElementById.

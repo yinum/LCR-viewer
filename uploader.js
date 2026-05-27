@@ -189,6 +189,24 @@
     if (onChange) onChange();
   }
 
+  // Add a spectrum from a pasted text block. Returns {ok, message} so the
+  // dialog can show a parse error inline rather than as a new ✗ row.
+  function ingestPastedText(text, nameInput, store, onChange) {
+    const parsed = parseSpectrum(text);
+    if (!parsed.ok) return { ok: false, message: parsed.message };
+    let name = (nameInput || '').trim();
+    if (!name) name = 'pasted_' + Date.now().toString(36);
+    if (!/\.(xy|csv|txt)$/i.test(name)) name += '.xy';
+    store.add({
+      name: name,
+      mz: parsed.mz, intensity: parsed.intensity,
+      precursor: precursorFromName(name),
+      parseStatus: 'ok',
+    });
+    if (onChange) onChange();
+    return { ok: true };
+  }
+
   function isUploaderBuild() {
     return typeof window !== 'undefined' && !!window.__LCR_BUILD__ &&
            window.__LCR_BUILD__ !== 'default';
@@ -325,6 +343,34 @@
     const dlAll = document.getElementById('dl-all-zip');
     if (dlAll) dlAll.addEventListener('click', buildAllCsvsZip);
 
+    const pasteOpenA = document.getElementById('uploader-paste');
+    const pasteOpenB = document.getElementById('uploader-paste-more');
+    const pasteModal = document.getElementById('uploader-paste-modal');
+    const pasteText = document.getElementById('uploader-paste-text');
+    const pasteName = document.getElementById('uploader-paste-name');
+    const pasteErr = document.getElementById('uploader-paste-err');
+    const pasteCancel = document.getElementById('uploader-paste-cancel');
+    const pasteAdd = document.getElementById('uploader-paste-add');
+    function openPaste() {
+      if (!pasteModal) return;
+      pasteText.value = ''; pasteName.value = ''; pasteErr.textContent = '';
+      pasteModal.hidden = false;
+      setTimeout(() => pasteText.focus(), 0);
+    }
+    function closePaste() { if (pasteModal) pasteModal.hidden = true; }
+    if (pasteOpenA) pasteOpenA.addEventListener('click', openPaste);
+    if (pasteOpenB) pasteOpenB.addEventListener('click', openPaste);
+    if (pasteCancel) pasteCancel.addEventListener('click', closePaste);
+    if (pasteModal) pasteModal.addEventListener('click', (ev) => {
+      if (ev.target === pasteModal) closePaste();
+    });
+    if (pasteAdd) pasteAdd.addEventListener('click', () => {
+      const res = ingestPastedText(pasteText.value, pasteName.value,
+                                   store, onStoreChange);
+      if (res.ok) closePaste();
+      else pasteErr.textContent = res.message || 'Could not parse.';
+    });
+
     const collapseBtn = document.getElementById('uploader-collapse');
     const expandBtn = document.getElementById('uploader-expand');
     if (collapseBtn) collapseBtn.addEventListener('click', () => {
@@ -435,6 +481,7 @@
   root.LCRUploader.ingestFiles = ingestFiles;
   root.LCRUploader.ingestDataTransfer = ingestDataTransfer;
   root.LCRUploader.loadExampleSpectrum = loadExampleSpectrum;
+  root.LCRUploader.ingestPastedText = ingestPastedText;
   root.LCRUploader.isUploaderBuild = isUploaderBuild;
   root.LCRUploader.renderSidebar = renderSidebar;  // exposed for tests
   root.LCRUploader.initUploader = initUploader;

@@ -757,11 +757,14 @@ TEMPLATE = r"""<!DOCTYPE html>
     <input id="uploader-picker" type="file" multiple webkitdirectory
            hidden>
   </div>
-  <button id="uploader-try-example" style="margin-top:18px">
-    Try with example spectrum</button>
+  <div style="margin-top:18px;display:flex;gap:8px;justify-content:center">
+    <button id="uploader-try-example">Try with example spectrum</button>
+    <button id="uploader-paste">Paste data&hellip;</button>
+  </div>
   <p style="font-size:11px;color:#999;margin-top:32px">
     Accepted file types: <code>.xy</code>, <code>.csv</code>, <code>.txt</code>
-    (two columns: m/z and intensity)</p>
+    (two columns: m/z and intensity). Paste accepts the same columns from
+    Excel / Origin.</p>
 </div>
 
 <button id="uploader-expand" title="Show spectra list" style="
@@ -783,10 +786,48 @@ TEMPLATE = r"""<!DOCTYPE html>
   <ul id="uploader-list" style="list-style:none;padding:0;margin:0"></ul>
   <button id="uploader-add-more"
           style="margin-top:8px;width:100%;font-size:12px">+ Add more</button>
+  <button id="uploader-paste-more"
+          style="margin-top:4px;width:100%;font-size:12px">+ Paste data</button>
   <input id="uploader-picker-more" type="file" multiple webkitdirectory hidden>
+  <p style="font-size:10px;color:#888;margin:10px 0 0;line-height:1.4">
+    Spectra are in browser memory only &mdash; download CSVs before
+    closing or refreshing.</p>
 </div>
 <div id="uploader-pane-offset" hidden
      style="position:absolute;left:220px;right:0;top:0"></div>
+
+<!-- Paste-data modal: hidden until uploader.js opens it. -->
+<div id="uploader-paste-modal" hidden style="
+     position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10;
+     display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:6px;padding:18px 20px;
+              max-width:560px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+    <div style="font-weight:600;font-size:15px;margin-bottom:6px">
+      Paste spectrum data</div>
+    <div style="font-size:12px;color:#666;margin-bottom:10px;line-height:1.4">
+      Two columns: m/z and intensity. Whitespace, tab, or comma-separated
+      (Excel / Origin / clipboard works directly). Data is not saved &mdash;
+      download the CSV before closing if you want to keep it.</div>
+    <label style="font-size:11px;color:#555;display:block;margin-bottom:3px">
+      Name (optional &mdash; trailing number sets precursor m/z)</label>
+    <input id="uploader-paste-name" type="text"
+           placeholder="e.g. mysample_3300"
+           style="width:100%;box-sizing:border-box;padding:5px 7px;
+                  font-size:13px;border:1px solid #bbb;border-radius:4px;
+                  margin-bottom:10px">
+    <textarea id="uploader-paste-text" rows="10" placeholder="800.005&#9;0&#10;805.500&#9;0&#10;805.512&#9;8&#10;&hellip;"
+              style="width:100%;box-sizing:border-box;padding:6px 8px;
+                     font-family:ui-monospace,Menlo,monospace;font-size:12px;
+                     border:1px solid #bbb;border-radius:4px;resize:vertical;
+                     min-height:160px"></textarea>
+    <div id="uploader-paste-err"
+         style="font-size:11px;color:#c33;margin-top:6px;min-height:14px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button id="uploader-paste-cancel">Cancel</button>
+      <button id="uploader-paste-add">Add spectrum</button>
+    </div>
+  </div>
+</div>
 <div id="controls">
  <div class="ctl chk">
    <label><input type="checkbox" id="scaleon" __SCALEON__>
