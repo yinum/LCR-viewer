@@ -530,6 +530,33 @@ const LadderLabeler = (function () {
     }
   }
 
+  // Serialize per-spectrum ladder state for stash/restore on spectrum switch.
+  // Returns a plain-object snapshot (JSON-safe). Sets are converted to arrays.
+  function serializeState() {
+    return {
+      ladders: state.ladders.map(L => Object.assign({}, L, {
+        excludedZ: Array.from(L.excludedZ),
+      })),
+      activeLadderId: state.activeLadderId,
+    };
+  }
+
+  // Restore per-spectrum ladder state from a snapshot produced by serializeState.
+  // Accepts the empty-array shorthand [] used by uploader.js when no state was
+  // ever saved for a spectrum. After loading, callers should trigger a re-render.
+  function loadState(serialized) {
+    if (Array.isArray(serialized)) {
+      // Shorthand: no ladders saved yet for this spectrum.
+      state.ladders = [];
+      state.activeLadderId = null;
+    } else {
+      state.ladders = (serialized.ladders || []).map(L => Object.assign({}, L, {
+        excludedZ: new Set(L.excludedZ || []),
+      }));
+      state.activeLadderId = serialized.activeLadderId || null;
+    }
+  }
+
   return {
     state,
     _resetIdCounter,
@@ -546,5 +573,7 @@ const LadderLabeler = (function () {
     toggleAucInclude,
     buildAnnotations,
     handlePlotClick,
+    serializeState,
+    loadState,
   };
 })();

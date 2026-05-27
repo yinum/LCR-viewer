@@ -251,12 +251,20 @@
   }
 
   let store, onStoreChange;
+  let _previousActiveName = null;
 
   function onStoreChange_impl() {
+    // Stash outgoing ladders.
+    if (_previousActiveName && typeof LadderLabeler !== 'undefined' &&
+        LadderLabeler.serializeState) {
+      const prev = store.all().find(e => e.name === _previousActiveName);
+      if (prev) prev.ladders = LadderLabeler.serializeState();
+    }
     const a = store.active();
     if (!a) {
       showEmptyState(true);
       renderSidebar(store);
+      _previousActiveName = null;
       return;
     }
     showEmptyState(false);
@@ -266,6 +274,11 @@
     if (typeof loadSpectrum === 'function') {
       loadSpectrum(a.mz, a.intensity, csvName);
     }
+    // Restore incoming ladders.
+    if (typeof LadderLabeler !== 'undefined' && LadderLabeler.loadState) {
+      LadderLabeler.loadState(a.ladders || []);
+    }
+    _previousActiveName = a.name;
   }
 
   function initUploader() {

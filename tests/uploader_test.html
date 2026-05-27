@@ -105,6 +105,18 @@ try {
   s3.add({ name: 'good.xy', mz:[1], intensity:[1] });
   check('store: good entry after error becomes active',
         s3.activeName() === 'good.xy');
+
+  // --- stash/restore round-trip via the store ---
+  const s2 = LCRUploader.createStore();
+  s2.add({ name: 'a.xy', mz:[1,2,3], intensity:[1,2,3] });
+  s2.add({ name: 'b.xy', mz:[4,5,6], intensity:[4,5,6] });
+  // Simulate user adding a ladder while A is active:
+  s2.active().ladders = [{ id: 'lA', z0: 8, M: 26400 }];
+  s2.setActive('b.xy');
+  s2.active().ladders = [{ id: 'lB', z0: 6, M: 13200 }];
+  s2.setActive('a.xy');
+  check('store: ladders preserved on A→B→A switch',
+        s2.active().ladders[0].id === 'lA');
 } catch (e) {
   check('exception during test run', false, e.message + '\n' + e.stack);
 }
