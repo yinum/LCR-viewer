@@ -1530,6 +1530,24 @@ function precursor_from_name() {
   return m ? parseFloat(m[1]) : '';
 }
 </script>
+<div id="uploader-errpanel" hidden style="
+     position:fixed;right:16px;bottom:16px;max-width:420px;
+     background:#fff8e1;border:1px solid #d8b800;border-radius:6px;
+     padding:14px 16px;font-size:13px;color:#333;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:9999">
+  <div style="font-weight:600;margin-bottom:6px">
+    Something unexpected happened</div>
+  <p style="margin:0 0 8px;line-height:1.4">
+    Sorry — the viewer hit a problem we didn't plan for. Copy the box below
+    and paste it into ChatGPT (or any AI assistant), and ask it to help
+    figure out what went wrong.</p>
+  <pre id="uploader-errbody" style="background:#fff;border:1px solid #ddd;
+     padding:8px;font-size:11px;line-height:1.3;max-height:160px;
+     overflow:auto;white-space:pre-wrap;margin:0 0 8px"></pre>
+  <div style="display:flex;gap:8px">
+    <button id="uploader-errcopy">Copy</button>
+    <button id="uploader-errclose">Dismiss</button>
+  </div>
+</div>
 </body>
 </html>
 """

@@ -330,6 +330,55 @@
     }
   }
 
+  function showErrorPanel(err) {
+    const panel = document.getElementById('uploader-errpanel');
+    const body = document.getElementById('uploader-errbody');
+    if (!panel || !body) return;
+    const a = store && store.active && store.active();
+    const stack = (err && err.stack) ? err.stack.split('\n').slice(0, 6).join('\n')
+                                     : '(no stack)';
+    body.textContent =
+      `LCR-viewer ${window.__LCR_BUILD__ || 'unknown'}\n` +
+      `Browser: ${navigator.userAgent}\n` +
+      `Active file: ${a ? a.name : 'none'}\n` +
+      `Spectra loaded: ${store ? store.all().length : 0}\n` +
+      `Error: ${err && err.message || String(err)}\n` +
+      `Stack: ${stack}`;
+    panel.hidden = false;
+  }
+
+  function initErrorPanel() {
+    if (!isUploaderBuild()) return;
+    window.addEventListener('error', ev => showErrorPanel(ev.error || ev));
+    window.addEventListener('unhandledrejection', ev =>
+      showErrorPanel(ev.reason || ev));
+    const copy = document.getElementById('uploader-errcopy');
+    const close = document.getElementById('uploader-errclose');
+    const body = document.getElementById('uploader-errbody');
+    if (copy) copy.addEventListener('click', () => {
+      if (!body) return;
+      navigator.clipboard.writeText(body.textContent).catch(() => {
+        // Fallback: select-all so the user can Cmd-C manually.
+        const r = document.createRange(); r.selectNode(body);
+        getSelection().removeAllRanges(); getSelection().addRange(r);
+      });
+      copy.textContent = 'Copied!';
+      setTimeout(() => copy.textContent = 'Copy', 1500);
+    });
+    if (close) close.addEventListener('click', () => {
+      const p = document.getElementById('uploader-errpanel');
+      if (p) p.hidden = true;
+    });
+  }
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initErrorPanel);
+    } else {
+      initErrorPanel();
+    }
+  }
+
   root.LCRUploader = root.LCRUploader || {};
   root.LCRUploader.parseSpectrum = parseSpectrum;
   root.LCRUploader.precursorFromName = precursorFromName;
@@ -340,4 +389,5 @@
   root.LCRUploader.isUploaderBuild = isUploaderBuild;
   root.LCRUploader.renderSidebar = renderSidebar;  // exposed for tests
   root.LCRUploader.initUploader = initUploader;
+  root.LCRUploader.showErrorPanel = showErrorPanel;
 })(typeof window !== 'undefined' ? window : global);

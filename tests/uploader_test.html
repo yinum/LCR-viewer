@@ -133,6 +133,27 @@ try {
   } else {
     // Labeler not loaded in this test environment — skip.
   }
+  // --- error panel (DOM stubs in Node) ---
+  if (typeof document !== 'undefined') {
+    // Provide the panel + body elements the function looks for via getElementById.
+    const panel = document.createElement('div'); panel.id = 'uploader-errpanel';
+    panel.hidden = true;
+    const body  = document.createElement('pre'); body.id = 'uploader-errbody';
+    document.body.append(panel, body);
+    // Reset window.__LCR_BUILD__ so the build-stamp shows in the payload.
+    if (typeof window !== 'undefined') window.__LCR_BUILD__ = '2026-test';
+    if (typeof navigator === 'undefined') {
+      // Node's vm lacks navigator; stub it.
+      window.navigator = { userAgent: 'NodeTest/1.0' };
+    }
+    LCRUploader.showErrorPanel(new Error('test-error'));
+    check('error panel: body text contains build stamp',
+          body.textContent.includes('LCR-viewer 2026-test'));
+    check('error panel: body text contains error message',
+          body.textContent.includes('test-error'));
+    check('error panel: hidden flipped to false',
+          panel.hidden === false);
+  }
 } catch (e) {
   check('exception during test run', false, e.message + '\n' + e.stack);
 }
