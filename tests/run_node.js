@@ -1,11 +1,12 @@
-// Headless runner for tests/ladder_labeler_test.html.
+// Headless runner for HTML test pages (ladder_labeler_test.html, uploader_test.html, …).
 //
-// The HTML test page assumes a browser (uses document.getElementById, prompt,
-// etc.). This runner shims just enough of the DOM + window to let it execute
-// under Node, so subagents and CI can verify the labeler's pure-math + state
-// tests without a browser.
+// The HTML test pages assume a browser (uses document.getElementById, prompt,
+// etc.). This runner shims just enough of the DOM + window to let them execute
+// under Node, so subagents and CI can verify pure-math + state tests without a
+// browser.
 //
-// Usage:  node tests/run_node.js
+// Usage:  node tests/run_node.js [test-page-filename]
+//   Default filename: ladder_labeler_test.html
 // Exit:   0 on all-pass; 1 on any failure or load error.
 //
 // What it shims:
@@ -17,23 +18,28 @@
 //     temporarily); the default impl throws (no test should silently prompt).
 //
 // What it does NOT shim: Plotly, layout, IndexedDB, FileSystem APIs. The
-// labeler test file uses none of these — it tests pure functions and state.
+// test files use none of these — they test pure functions and state.
 
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 const here = path.dirname(__filename);
-const labelerJs = fs.readFileSync(path.join(here, '..', 'ladder_labeler.js'), 'utf8');
-const testHtml = fs.readFileSync(path.join(here, 'ladder_labeler_test.html'), 'utf8');
+const testFile = process.argv[2] || 'ladder_labeler_test.html';
+const testHtml = fs.readFileSync(path.join(here, testFile), 'utf8');
 
-// Extract the inline test script — everything between the second <script> tag
-// (after the <script src="../ladder_labeler.js"> tag) and the next </script>.
-const inlineMatch = testHtml.match(
-  /<script src="\.\.\/ladder_labeler\.js"><\/script>\s*<script>([\s\S]*?)<\/script>/
-);
+// Find which JS module(s) the test page loads via <script src="../X.js">.
+// Concatenate them all, then extract the inline test script.
+const srcRefs = [...testHtml.matchAll(
+  /<script src="\.\.\/([^"]+\.js)"><\/script>/g
+)].map(m => m[1]);
+let moduleSrc = '';
+for (const ref of srcRefs) {
+  moduleSrc += fs.readFileSync(path.join(here, '..', ref), 'utf8') + '\n';
+}
+const inlineMatch = testHtml.match(/<\/script>\s*<script>([\s\S]*?)<\/script>/);
 if (!inlineMatch) {
-  console.error('Could not extract inline test script from ladder_labeler_test.html');
+  console.error(`Could not extract inline test script from ${testFile}`);
   process.exit(1);
 }
 const inlineScript = inlineMatch[1];
@@ -64,7 +70,7 @@ const fakeWindow = {
   prompt: () => { throw new Error('window.prompt called without a stub'); },
 };
 
-// Build a sandbox and run the labeler module + the inline test script.
+// Build a sandbox and run the module(s) + the inline test script.
 const sandbox = {
   document: fakeDoc,
   window: fakeWindow,
@@ -86,14 +92,14 @@ Object.defineProperty(sandbox, 'prompt', {
 vm.createContext(sandbox);
 
 try {
-  vm.runInContext(labelerJs, sandbox, { filename: 'ladder_labeler.js' });
+  vm.runInContext(moduleSrc, sandbox, { filename: 'modules' });
 } catch (e) {
-  console.error('Load error in ladder_labeler.js:', e.message);
+  console.error('Load error in modules:', e.message);
   process.exit(1);
 }
 
 try {
-  vm.runInContext(inlineScript, sandbox, { filename: 'ladder_labeler_test.html (inline)' });
+  vm.runInContext(inlineScript, sandbox, { filename: testFile + ' (inline)' });
 } catch (e) {
   // The inline script has its own try/catch around the test body, so reaching
   // this branch means the wrapper itself threw — usually a missing shim.
