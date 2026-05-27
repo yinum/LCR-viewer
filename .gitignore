@@ -10,6 +10,9 @@ plotly-basic.min.js
 # Generated viewers + sibling CSVs land here (output/LCR/<dataset>/) — never commit
 /output/
 
+# Single-file uploader build artifact (git-ignored alongside /output/)
+/dist/
+
 # Python
 __pycache__/
 *.pyc

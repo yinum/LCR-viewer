@@ -216,6 +216,33 @@ class TestBuildHtml(unittest.TestCase):
         )
 
 
+    def test_uploader_flag_writes_single_html_to_dist(self):
+        """--uploader emits dist/LCR_viewer.html with no spectrum baked in."""
+        import subprocess, os, tempfile, shutil
+        here = os.path.dirname(os.path.abspath(blv.__file__))
+        dist = os.path.join(here, "dist")
+        if os.path.isdir(dist):
+            shutil.rmtree(dist)
+        try:
+            r = subprocess.run(
+                ["python3", "build_lcr_viewer.py", "--uploader"],
+                cwd=here, capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(r.returncode, 0, msg=r.stderr)
+            out = os.path.join(dist, "LCR_viewer.html")
+            self.assertTrue(os.path.isfile(out), "dist/LCR_viewer.html not written")
+            body = open(out).read()
+            # Build stamp contains "-uploader-" and is present in the head section.
+            self.assertRegex(body[:5000], r"-uploader-",
+                             "build stamp marker missing in HTML head")
+            self.assertNotIn("__MZ__", body, "unfilled __MZ__ placeholder")
+            self.assertIn("loadSpectrum([], [],", body,
+                          "uploader build should start with empty spectrum")
+        finally:
+            if os.path.isdir(dist):
+                shutil.rmtree(dist)
+
+
 class TestSavePostedCsv(unittest.TestCase):
     def setUp(self):
         self.out = tempfile.mkdtemp()
@@ -382,26 +409,41 @@ class TestPrecursorThreshold(unittest.TestCase):
 
 class TestParseArgs(unittest.TestCase):
     def test_serve_flag_detected_and_stripped(self):
-        serve, src, out = blv.parse_args(["--serve", "/data", "/out"], "/here")
+        serve, src, out, uploader = blv.parse_args(["--serve", "/data", "/out"], "/here")
         self.assertTrue(serve)
         self.assertEqual(src, "/data")
         self.assertEqual(out, "/out")
+        self.assertFalse(uploader)
 
     def test_serve_flag_anywhere(self):
-        serve, src, out = blv.parse_args(["/data", "--serve"], "/here")
+        serve, src, out, uploader = blv.parse_args(["/data", "--serve"], "/here")
         self.assertTrue(serve)
         self.assertEqual(src, "/data")
+        self.assertFalse(uploader)
 
     def test_no_serve_flag(self):
-        serve, src, out = blv.parse_args(["/data"], "/here")
+        serve, src, out, uploader = blv.parse_args(["/data"], "/here")
         self.assertFalse(serve)
         self.assertEqual(src, "/data")
+        self.assertFalse(uploader)
+
+    def test_uploader_flag_sets_uploader_mode(self):
+        serve, src, out, uploader = blv.parse_args(["--uploader"], "/here")
+        self.assertFalse(serve)
+        self.assertIsNone(src)
+        self.assertEqual(out, os.path.join("/here", "dist"))
+        self.assertTrue(uploader)
+
+    def test_uploader_flag_custom_dist(self):
+        serve, src, out, uploader = blv.parse_args(["--uploader", "/custom/dist"], "/here")
+        self.assertTrue(uploader)
+        self.assertEqual(out, "/custom/dist")
 
     def test_default_output_from_input_folder_name(self):
         d = tempfile.mkdtemp()
         sub = os.path.join(d, "PF4_polyP")
         os.makedirs(sub)
-        _, src, out = blv.parse_args([sub], "/repo")
+        _, src, out, _ = blv.parse_args([sub], "/repo")
         # dataset subfolder takes the input folder's name
         self.assertEqual(out, os.path.join("/repo", "output", "LCR", "PF4_polyP"))
         os.rmdir(sub)
@@ -413,7 +455,7 @@ class TestParseArgs(unittest.TestCase):
         os.makedirs(sub)
         f = os.path.join(sub, "run_250.xy")
         open(f, "w").close()
-        _, src, out = blv.parse_args([f], "/repo")
+        _, src, out, _ = blv.parse_args([f], "/repo")
         # a single input file -> dataset is its parent folder's name
         self.assertEqual(out, os.path.join("/repo", "output", "LCR", "polyP"))
         os.unlink(f)
@@ -421,7 +463,7 @@ class TestParseArgs(unittest.TestCase):
         os.rmdir(d)
 
     def test_explicit_output_dir_overrides_default(self):
-        _, src, out = blv.parse_args(["/data/PF4_polyP", "/custom/out"], "/repo")
+        _, src, out, _ = blv.parse_args(["/data/PF4_polyP", "/custom/out"], "/repo")
         self.assertEqual(out, "/custom/out")
 
 

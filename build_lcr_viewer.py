@@ -53,6 +53,20 @@ PRESET = {
     },
 }
 
+def _build_stamp(here):
+    """A short string baked into uploader HTML for the catch-all error panel.
+    Format: 'YYYY-MM-DD-uploader-<git-short-sha or nogit>'."""
+    import datetime, subprocess
+    date = datetime.date.today().isoformat()
+    try:
+        sha = subprocess.run(
+            ["git", "-C", here, "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=2,
+        ).stdout.strip() or "nogit"
+    except Exception:
+        sha = "nogit"
+    return "%s-uploader-%s" % (date, sha)
+
 def load_preset(here):
     """Effective preset: the built-in PRESET overlaid with preset.json, if a
     readable one sits next to the script. preset.json is written by the
@@ -457,17 +471,65 @@ def build_html(mz, it, thr, plotly, html_name, preset, labeler_js):
     html = html.replace("__LADDER_ENABLED__",
                         "checked" if ll.get("enabled", False) else "")
     html = html.replace("__LADDER_TOL__", str(ll.get("tol_mz", 5.0)))
+    html = html.replace("__UPLOADER_BUILD__", "default")
+    html = html.replace("__UPLOADER_JS__", "")
+    html = html.replace("__JSZIP__", "")
+    html = html.replace("__EXAMPLE_SPECTRUM_B64__", "")
+    return html
+
+def build_uploader_html(plotly, labeler_js, uploader_js, jszip_js,
+                       example_xy, preset, build_stamp):
+    """Assemble the self-contained uploader HTML. Same template as build_html
+    but with empty initial spectrum, uploader.js and JSZip inlined, the
+    bundled example spectrum embedded as base64, and the build stamp injected
+    for the catch-all error panel. The single-spectrum FSA buttons (Update
+    sibling CSV / Link CSV / Save preset) are hidden via the __UPLOADER_BUILD__
+    body class — see the template's [data-uploader-only] / [data-default-only]
+    selectors."""
+    html = TEMPLATE
+    html = html.replace("__SCALEON__",
+                        "checked" if preset.get("scale_on", True) else "")
+    html = html.replace("__SCALE__", str(preset["scale"]))
+    html = html.replace("__THR__", "%g" % 0)        # set on first activation
+    html = html.replace("__WIDTH__", str(preset["width_mz"]))
+    html = html.replace("__POLY__", str(preset["poly"]))
+    html = html.replace("__RAWOV__", "checked" if preset["show_overlay"] else "")
+    html = html.replace('value="%s"' % preset["method"],
+                        'value="%s" selected' % preset["method"])
+    html = html.replace("__CSVNAME__", json.dumps(""))
+    html = html.replace("__CSVHREF__", "")
+    html = html.replace("__MZ__", "[]")
+    html = html.replace("__IT__", "[]")
+    html = html.replace("__PLOTLY__", plotly)
+    html = html.replace("__LADDER_LABELER__", labeler_js)
+    ll = preset.get("ladder_labels", {})
+    html = html.replace("__LADDER_ENABLED__",
+                        "checked" if ll.get("enabled", False) else "")
+    html = html.replace("__LADDER_TOL__", str(ll.get("tol_mz", 5.0)))
+    html = html.replace("__UPLOADER_BUILD__", build_stamp)
+    html = html.replace("__UPLOADER_JS__", uploader_js)
+    html = html.replace("__JSZIP__", jszip_js)
+    html = html.replace("__EXAMPLE_SPECTRUM_B64__", example_xy)
     return html
 
 def parse_args(argv, here):
-    """Parse CLI args into (serve_mode, src, out_dir). A --serve flag anywhere
-    in argv enables localhost serve mode; the remaining positionals are INPUT
-    then OUTPUT_DIR. When OUTPUT_DIR is omitted it defaults to
-    <here>/output/LCR/<dataset> -- a subfolder of the code repo -- where
-    <dataset> is the input folder's name (the parent folder's name for a single
-    input file), so each dataset's viewers land in their own subfolder."""
+    """Parse CLI args.
+
+    Default mode: returns (serve_mode=False/True, src, out_dir, uploader=False).
+    --uploader mode: returns (False, None, <here>/dist, True) and signals main()
+    to emit a single self-contained LCR_viewer.html for collaborators (no
+    spectrum baked in). --serve and --uploader are mutually exclusive.
+    """
+    uploader_mode = "--uploader" in argv
     serve_mode = "--serve" in argv
-    pos = [a for a in argv if a != "--serve"]
+    if uploader_mode and serve_mode:
+        sys.exit("--uploader and --serve are mutually exclusive")
+    pos = [a for a in argv if a not in ("--serve", "--uploader")]
+
+    if uploader_mode:
+        dist = pos[0] if pos else os.path.join(here, "dist")
+        return False, None, dist, True
+
     src = pos[0] if len(pos) > 0 else os.path.join(here, "clipboard_spectrum.txt")
     if len(pos) > 1:
         out_dir = pos[1]
@@ -476,7 +538,7 @@ def parse_args(argv, here):
             os.path.abspath(src))
         dataset = os.path.basename(os.path.abspath(folder)) or "LCR"
         out_dir = os.path.join(here, "output", "LCR", dataset)
-    return serve_mode, src, out_dir
+    return serve_mode, src, out_dir, False
 
 def serve(out_dir, written, csv_written, here):
     """Serve the freshly built viewers (and their sibling CSVs) on localhost
@@ -567,7 +629,7 @@ def serve(out_dir, written, csv_written, here):
 
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
-    serve_mode, src, out_dir = parse_args(sys.argv[1:], here)
+    serve_mode, src, out_dir, uploader_mode = parse_args(sys.argv[1:], here)
     os.makedirs(out_dir, exist_ok=True)
 
     with open(os.path.join(here, "plotly-basic.min.js")) as fh:
@@ -576,6 +638,36 @@ def main():
         labeler_js = fh.read()
     preset = load_preset(here)
 
+    if uploader_mode:
+        # Build the single self-contained uploader HTML.
+        uploader_js_path = os.path.join(here, "uploader.js")
+        jszip_path = os.path.join(here, "jszip.min.js")
+        example_path = os.path.join(here, "example_spectrum.xy")
+        if not os.path.isfile(uploader_js_path):
+            sys.exit("uploader.js not found next to the script")
+        if not os.path.isfile(jszip_path):
+            sys.exit("jszip.min.js not found next to the script — "
+                     "download once per README.md")
+        if not os.path.isfile(example_path):
+            sys.exit("example_spectrum.xy not found next to the script")
+        with open(uploader_js_path) as fh:
+            uploader_js = fh.read()
+        with open(jszip_path) as fh:
+            jszip_js = fh.read()
+        import base64
+        with open(example_path, "rb") as fh:
+            example_b64 = base64.b64encode(fh.read()).decode("ascii")
+        build_stamp = _build_stamp(here)
+        html = build_uploader_html(plotly, labeler_js, uploader_js, jszip_js,
+                                   example_b64, preset, build_stamp)
+        out = os.path.join(out_dir, "LCR_viewer.html")
+        with open(out, "w") as fh:
+            fh.write(html)
+        print("Wrote %s  (%.1f KB, build %s)" %
+              (out, os.path.getsize(out) / 1024, build_stamp))
+        return
+
+    # ---- default flow (unchanged) ----
     files = iter_spectrum_files(src)
     if not files:
         sys.exit("No spectrum files found at " + src)
@@ -638,6 +730,11 @@ TEMPLATE = r"""<!DOCTYPE html>
  #status{color:#0050b3;font-weight:600}
  #csvfile{font-size:11px;color:#0050b3;word-break:break-all;max-width:240px}
 </style>
+<meta name="lcr-build" content="__UPLOADER_BUILD__">
+<script>window.__LCR_BUILD__="__UPLOADER_BUILD__";</script>
+<script>__UPLOADER_JS__</script>
+<script>__JSZIP__</script>
+<script>window.__LCR_EXAMPLE_B64__="__EXAMPLE_SPECTRUM_B64__";</script>
 </head>
 <body>
 <div id="controls">
