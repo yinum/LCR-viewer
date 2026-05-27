@@ -799,7 +799,7 @@ TEMPLATE = r"""<!DOCTYPE html>
    <label><input type="checkbox" id="rawov" __RAWOV__> pre-smoothing overlay</label>
    <label><input type="checkbox" id="logy"> log Y axis</label></div>
  <div class="ctl"><button id="dl">Download processed CSV</button></div>
- <div class="ctl uploader-hide-when-empty">
+ <div class="ctl">
   <button id="dl-all-zip" hidden>Download all CSVs (zip)</button>
  </div>
  <div class="ctl"><button id="updatecsv">Update sibling CSV</button>
@@ -842,8 +842,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 </div>
 <!-- Uploader-only: hide single-spectrum FSA buttons when in uploader build. -->
 <style id="uploader-style" disabled>
- #updatecsv, #link, #savepreset,
- .uploader-hide-when-empty { display:none !important; }
+ #updatecsv, #link, #savepreset { display:none !important; }
  #controls, #plot, .hint { margin-left: 220px; }
  @media (max-width: 768px) {
    #uploader-sidebar { position:static;width:100%;height:auto;border-right:none;
@@ -1135,9 +1134,10 @@ function computeProcessed(){
 // current control values — without disturbing the visible plot or PROC_X/PROC_Y.
 function buildProcessedCsvForSpectrum(mz,it){
  const savedMz=RAW_MZ,savedIt=RAW_IT,savedG=G;
- RAW_MZ=mz; RAW_IT=it; G=buildGrid();
+ RAW_MZ=mz; RAW_IT=it;
  let csv='';
  try{
+  G=buildGrid();
   const proc=computeProcessed();
   let lines='m/z,intensity_processed\n';
   for(let i=0;i<proc.x.length;i++)
