@@ -231,13 +231,45 @@ class TestBuildHtml(unittest.TestCase):
             self.assertEqual(r.returncode, 0, msg=r.stderr)
             out = os.path.join(dist, "LCR_viewer.html")
             self.assertTrue(os.path.isfile(out), "dist/LCR_viewer.html not written")
-            body = open(out).read()
+            with open(out) as fh:
+                body = fh.read()
             # Build stamp contains "-uploader-" and is present in the head section.
             self.assertRegex(body[:5000], r"-uploader-",
                              "build stamp marker missing in HTML head")
             self.assertNotIn("__MZ__", body, "unfilled __MZ__ placeholder")
             self.assertIn("loadSpectrum([], [],", body,
                           "uploader build should start with empty spectrum")
+        finally:
+            if os.path.isdir(dist):
+                shutil.rmtree(dist)
+
+
+    def test_uploader_html_has_no_unsubstituted_template_placeholders(self):
+        """Catch any future __XXX__ token in TEMPLATE that build_uploader_html
+        forgot to substitute. Allowlist runtime JS identifiers that legitimately
+        use the __XXX__ shape on window (e.g. window.__LCR_BUILD__).
+        """
+        import re, subprocess, os, shutil
+        here = os.path.dirname(os.path.abspath(blv.__file__))
+        dist = os.path.join(here, "dist")
+        if os.path.isdir(dist):
+            shutil.rmtree(dist)
+        try:
+            r = subprocess.run(
+                ["python3", "build_lcr_viewer.py", "--uploader"],
+                cwd=here, capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(r.returncode, 0, msg=r.stderr)
+            with open(os.path.join(dist, "LCR_viewer.html")) as fh:
+                body = fh.read()
+            # JS identifiers that legitimately start with __ and live on window
+            # or in vendored third-party code (e.g. JSZip's Promise polyfill uses
+            # __NPO__ as an internal property name on promise objects).
+            ALLOWED = {"__LCR_BUILD__", "__LCR_EXAMPLE_B64__", "__NPO__"}
+            leftovers = [m for m in re.findall(r"__[A-Z_]+__", body)
+                         if m not in ALLOWED]
+            self.assertEqual(leftovers, [],
+                             "Unsubstituted template placeholders: %s" % set(leftovers))
         finally:
             if os.path.isdir(dist):
                 shutil.rmtree(dist)
@@ -465,6 +497,13 @@ class TestParseArgs(unittest.TestCase):
     def test_explicit_output_dir_overrides_default(self):
         _, src, out, _ = blv.parse_args(["/data/PF4_polyP", "/custom/out"], "/repo")
         self.assertEqual(out, "/custom/out")
+
+    def test_uploader_and_serve_are_mutually_exclusive(self):
+        """--uploader and --serve cannot be combined."""
+        with self.assertRaises(SystemExit) as cm:
+            blv.parse_args(["--uploader", "--serve"], "/tmp/x")
+        # sys.exit("message...") raises SystemExit with the message as .code
+        self.assertIn("mutually exclusive", str(cm.exception.code))
 
 
 class TestSavePostedPreset(unittest.TestCase):
