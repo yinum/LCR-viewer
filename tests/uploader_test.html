@@ -53,6 +53,16 @@ try {
     return !s.ok && /line 3/i.test(s.message);
   })());
 
+  check('parseSpectrum: 3-col first row → skipped, then no-data error', (() => {
+    const s = LCRUploader.parseSpectrum('100 1 0.5\n200 2 0.3\n');
+    return !s.ok && /couldn'?t read/i.test(s.message);
+  })());
+
+  check('parseSpectrum: error message says "columns" not "numbers"', (() => {
+    const s = LCRUploader.parseSpectrum('100 1\n200 2\noops 3 4 5\n');
+    return !s.ok && /columns/.test(s.message) && !/numbers/.test(s.message);
+  })());
+
   // --- precursorFromName ---
   check('precursorFromName: trailing integer', () =>
     LCRUploader.precursorFromName('PF4_polyP_3300.xy') === 3300);

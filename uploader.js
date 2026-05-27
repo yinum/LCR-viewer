@@ -22,7 +22,7 @@
       if (!raw) continue;
       const tokens = raw.split(/[\s,\t]+/).filter(t => t.length);
       const nums = tokens.map(Number);
-      const allNumeric = tokens.length >= 2 && nums.every(n => Number.isFinite(n));
+      const allNumeric = tokens.length === 2 && nums.every(n => Number.isFinite(n));
       if (!started) {
         if (allNumeric) {
           started = true;
@@ -35,7 +35,7 @@
         return {
           ok: false,
           message: "This file doesn't look like a 2-column spectrum " +
-                   `(line ${i + 1} has ${tokens.length} numbers).`,
+                   `(line ${i + 1} has ${tokens.length} columns).`,
         };
       }
       mz.push(nums[0]); it.push(nums[1]);
