@@ -737,6 +737,42 @@ TEMPLATE = r"""<!DOCTYPE html>
 <script>window.__LCR_EXAMPLE_B64__="__EXAMPLE_SPECTRUM_B64__";</script>
 </head>
 <body>
+<!-- Uploader-only chrome: visible when window.__LCR_BUILD__ is set. -->
+<div id="uploader-empty" hidden style="
+     padding:80px 20px;text-align:center;background:#fff">
+  <h1 style="font-size:28px;margin:0 0 12px;color:#333">
+    LCR spectrum viewer</h1>
+  <p style="font-size:14px;color:#666;max-width:520px;margin:0 auto 28px">
+    Drop one or more spectrum files (or a folder) here to view them. Scaling,
+    smoothing, and ladder labeling all happen in your browser — no files are
+    uploaded anywhere.</p>
+  <div id="uploader-drop"
+       style="border:2px dashed #999;border-radius:10px;padding:48px;
+              max-width:480px;margin:0 auto;cursor:pointer;
+              background:#fafafa;color:#666;font-size:14px">
+    Drop a file or folder here, or <u>click to browse</u>
+    <input id="uploader-picker" type="file" multiple webkitdirectory
+           hidden>
+  </div>
+  <button id="uploader-try-example" style="margin-top:18px">
+    Try with example spectrum</button>
+  <p style="font-size:11px;color:#999;margin-top:32px">
+    Accepted file types: <code>.xy</code>, <code>.csv</code>, <code>.txt</code>
+    (two columns: m/z and intensity)</p>
+</div>
+
+<div id="uploader-sidebar" hidden style="
+     position:fixed;left:0;top:0;bottom:0;width:220px;background:#f4f4f4;
+     border-right:1px solid #ddd;overflow:auto;padding:10px;font-size:12px;
+     z-index:5">
+  <div style="font-weight:600;margin-bottom:6px">Loaded spectra</div>
+  <ul id="uploader-list" style="list-style:none;padding:0;margin:0"></ul>
+  <button id="uploader-add-more"
+          style="margin-top:8px;width:100%;font-size:12px">+ Add more</button>
+  <input id="uploader-picker-more" type="file" multiple webkitdirectory hidden>
+</div>
+<div id="uploader-pane-offset" hidden
+     style="position:absolute;left:220px;right:0;top:0"></div>
 <div id="controls">
  <div class="ctl chk">
    <label><input type="checkbox" id="scaleon" __SCALEON__>
@@ -801,6 +837,17 @@ TEMPLATE = r"""<!DOCTYPE html>
          style="font-size:11px;color:#888;margin-top:3px"></span>
  </div>
 </div>
+<!-- Uploader-only: hide single-spectrum FSA buttons when in uploader build. -->
+<style id="uploader-style" disabled>
+ #updatecsv, #link, #savepreset,
+ .uploader-hide-when-empty { display:none !important; }
+ #controls, #plot, .hint { margin-left: 220px; }
+ @media (max-width: 768px) {
+   #uploader-sidebar { position:static;width:100%;height:auto;border-right:none;
+                       border-bottom:1px solid #ddd }
+   #controls, #plot, .hint { margin-left: 0; }
+ }
+</style>
 <div class="hint">
  Order: (1) if "Scale charge-reduced region" is on, m/z &ge; threshold x factor and
  the parent envelope stays x1; off skips scaling entirely (plain MS1 smoothing);

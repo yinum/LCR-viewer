@@ -189,6 +189,133 @@
     if (onChange) onChange();
   }
 
+  function isUploaderBuild() {
+    return typeof window !== 'undefined' && !!window.__LCR_BUILD__ &&
+           window.__LCR_BUILD__ !== 'default';
+  }
+
+  function renderSidebar(store) {
+    const ul = document.getElementById('uploader-list');
+    if (!ul) return;
+    ul.innerHTML = '';
+    const entries = store.all();
+    for (const e of entries) {
+      const li = document.createElement('li');
+      li.style.cssText = 'padding:5px 6px;margin:2px 0;border-radius:3px;' +
+        'cursor:pointer;display:flex;justify-content:space-between;' +
+        'align-items:center;' +
+        (store.active() === e ? 'background:#d6e9ff;font-weight:600;' :
+                                'background:#fff;');
+      const badge = e.parseStatus === 'ok' ? '✓' : '✗';
+      const left = document.createElement('span');
+      left.title = e.parseStatus === 'ok' ? e.name : e.parseMessage || e.name;
+      left.textContent = `${badge}  ${e.name}`;
+      left.style.cssText = 'overflow:hidden;text-overflow:ellipsis;' +
+        'white-space:nowrap;flex:1';
+      const x = document.createElement('button');
+      x.textContent = '✕';
+      x.style.cssText = 'font-size:10px;padding:0 4px;margin-left:4px;' +
+        'border:none;background:transparent;cursor:pointer;color:#999';
+      x.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        store.remove(e.name);
+        onStoreChange();
+      });
+      li.append(left, x);
+      li.addEventListener('click', () => {
+        if (e.parseStatus !== 'ok') return;
+        store.setActive(e.name);
+        onStoreChange();
+      });
+      ul.appendChild(li);
+    }
+  }
+
+  function showEmptyState(show) {
+    const empty = document.getElementById('uploader-empty');
+    const sidebar = document.getElementById('uploader-sidebar');
+    const offset = document.getElementById('uploader-pane-offset');
+    const style = document.getElementById('uploader-style');
+    if (!empty) return;
+    empty.hidden = !show;
+    if (sidebar) sidebar.hidden = show;
+    if (offset) offset.hidden = show;
+    if (style) style.disabled = show;
+    // Hide the rest of the viewer when on the landing page.
+    for (const id of ['controls', 'plot']) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = show ? 'none' : '';
+    }
+    document.querySelectorAll('.hint').forEach(el =>
+      el.style.display = show ? 'none' : '');
+  }
+
+  let store, onStoreChange;
+
+  function onStoreChange_impl() {
+    const a = store.active();
+    if (!a) {
+      showEmptyState(true);
+      renderSidebar(store);
+      return;
+    }
+    showEmptyState(false);
+    renderSidebar(store);
+    // Hand the active spectrum to the existing viewer entry point.
+    const csvName = a.name.replace(/\.[^.]+$/, '') + '.csv';
+    if (typeof loadSpectrum === 'function') {
+      loadSpectrum(a.mz, a.intensity, csvName);
+    }
+  }
+
+  function initUploader() {
+    if (!isUploaderBuild()) return;
+    store = createStore();
+    onStoreChange = onStoreChange_impl;
+    showEmptyState(true);
+
+    const drop = document.getElementById('uploader-drop');
+    const picker = document.getElementById('uploader-picker');
+    const pickerMore = document.getElementById('uploader-picker-more');
+    const addMore = document.getElementById('uploader-add-more');
+    const example = document.getElementById('uploader-try-example');
+
+    if (drop) {
+      drop.addEventListener('click', () => picker && picker.click());
+      drop.addEventListener('dragover', ev => {
+        ev.preventDefault();
+        drop.style.background = '#eaeaea';
+      });
+      drop.addEventListener('dragleave', () => drop.style.background = '#fafafa');
+      drop.addEventListener('drop', async (ev) => {
+        ev.preventDefault();
+        drop.style.background = '#fafafa';
+        await ingestDataTransfer(ev.dataTransfer, store, onStoreChange);
+      });
+    }
+    if (picker) picker.addEventListener('change', async (ev) => {
+      await ingestFiles(ev.target.files, store, onStoreChange);
+      ev.target.value = '';
+    });
+    if (pickerMore) pickerMore.addEventListener('change', async (ev) => {
+      await ingestFiles(ev.target.files, store, onStoreChange);
+      ev.target.value = '';
+    });
+    if (addMore) addMore.addEventListener('click', () =>
+      pickerMore && pickerMore.click());
+    if (example) example.addEventListener('click', () =>
+      loadExampleSpectrum(store, onStoreChange));
+  }
+
+  // Run after DOMContentLoaded so the static HTML is parsed.
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initUploader);
+    } else {
+      initUploader();
+    }
+  }
+
   root.LCRUploader = root.LCRUploader || {};
   root.LCRUploader.parseSpectrum = parseSpectrum;
   root.LCRUploader.precursorFromName = precursorFromName;
@@ -196,4 +323,7 @@
   root.LCRUploader.ingestFiles = ingestFiles;
   root.LCRUploader.ingestDataTransfer = ingestDataTransfer;
   root.LCRUploader.loadExampleSpectrum = loadExampleSpectrum;
+  root.LCRUploader.isUploaderBuild = isUploaderBuild;
+  root.LCRUploader.renderSidebar = renderSidebar;  // exposed for tests
+  root.LCRUploader.initUploader = initUploader;
 })(typeof window !== 'undefined' ? window : global);
