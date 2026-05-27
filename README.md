@@ -23,6 +23,25 @@ All controls update the plot live; PNG export and processed-CSV export are built
 Each build also writes a processed CSV next to the viewer (see
 [Sibling CSV file](#sibling-csv-file)).
 
+## For collaborators (no coding required)
+
+Use the web version: **https://yinum.github.io/LCR-viewer/**
+
+Or download a single `LCR_viewer.html` file from the
+[Releases page](https://github.com/yinum/LCR-viewer/releases) and double-click
+it. Either way:
+
+1. Drag one or more spectrum files (`.xy`, `.csv`, or `.txt`, two columns:
+   m/z and intensity) onto the page — or drop a whole folder.
+2. The viewer shows each spectrum in the sidebar; click any row to view it.
+3. Adjust smoothing / scaling / ladder labels live; download processed CSV
+   or PNG when you're done.
+
+No files are uploaded anywhere — all processing runs in your browser.
+
+Click "Try with example spectrum" to see what the tool does before you have
+your own data.
+
 ## Setup
 
 The Plotly basic bundle and JSZip are not committed (third-party; Plotly ~1 MB,

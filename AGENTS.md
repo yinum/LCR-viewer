@@ -92,4 +92,34 @@ viewers are unaffected. `plotly-basic.min.js` must sit next to the script
   `tests/ladder_labeler_test.html` (open in a browser). Spec:
   `docs/superpowers/specs/2026-05-22-ladder-labeling-design.md`.
 
+## Uploader mode (`--uploader`)
+
+`python3 build_lcr_viewer.py --uploader` emits a single
+`dist/LCR_viewer.html` for non-coder collaborators — drop spectra in the
+browser, get the same scale+smooth+ladder pipeline client-side. No
+spectrum is baked in; the FSA-dependent buttons (Update sibling CSV / Link
+CSV / Save preset) are hidden. Distributed as a GitHub Release asset and
+auto-deployed to GitHub Pages on push to `main`
+(`.github/workflows/pages.yml`).
+
+Architecture: the template's spectrum-init is now a `loadSpectrum(mz, it,
+csvName)` shim. Default builds call it once at script load; the uploader
+calls it on each sidebar click. Per-spectrum ladder state stashes through
+`LadderLabeler.serializeState() / loadState()` on switch.
+
+Files specific to uploader mode:
+- `uploader.js` — file parser (whitespace/comma/tab), spectra store, drop
+  handlers (file + folder), sidebar renderer, catch-all error panel,
+  bulk CSV→zip via JSZip.
+- `example_spectrum.xy` — tiny bundled sample for the "Try with example
+  spectrum" button. Committed code-side asset (the `*.xy` gitignore has
+  an explicit `!example_spectrum.xy` exception).
+- `jszip.min.js` — vendored at build time, gitignored, re-download via
+  the README setup section.
+- `dist/` — gitignored output directory for the uploader HTML.
+
+Spec: `docs/superpowers/specs/2026-05-26-lcr-uploader-design.md`.
+Plan: `docs/superpowers/plans/2026-05-26-lcr-uploader.md`.
+Smoke test: `docs/uploader-release-smoke.md`.
+
 See code comments in `build_lcr_viewer.py` for detail.
