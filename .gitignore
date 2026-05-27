@@ -25,3 +25,7 @@ preset.json
 
 # Test pages (allow the labeler test page; *.html is otherwise ignored)
 !tests/*.html
+
+# Bundled sample spectrum for uploader's "Try example" button — committed
+# code-side asset (not user data); shipped inside dist/LCR_viewer.html.
+!example_spectrum.xy
