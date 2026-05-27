@@ -1,6 +1,6 @@
-# polyP LCR spectrum viewer
+# LCR spectrum viewer
 
-Builds self-contained interactive HTML viewers for polyP limited-charge-reduction
+Builds self-contained interactive HTML viewers for limited-charge-reduction
 (LCR) mass spectra (Waters Synapt, positive mode) — one viewer per spectrum, or a
 whole folder of spectra in one run.
 
