@@ -716,9 +716,10 @@ TEMPLATE = r"""<!DOCTYPE html>
 <script>__PLOTLY__</script>
 <script>__LADDER_LABELER__</script>
 <script>
-const RAW_MZ=__MZ__;
-const RAW_IT=__IT__;
-const CSV_NAME=__CSVNAME__;
+// Mutable so the uploader can swap spectra without reloading the page.
+// In default builds, loadSpectrum is called exactly once at startup.
+let RAW_MZ=[], RAW_IT=[], CSV_NAME="";
+let G=null;  // populated by loadSpectrum — buildGrid reads RAW_MZ/RAW_IT
 
 // ---------- build uniform per-segment grid (once) ----------
 // GRID_DX is the target grid resolution (m/z). Each peak group is linearly
@@ -785,7 +786,21 @@ function buildGrid(){
  }
  return {gmz,git,bounds,nseg:segs.length};
 }
-const G=buildGrid();
+// Single entry point for setting the active spectrum. Both the default
+// build (one call at startup with the inlined arrays) and the uploader
+// (one call per sidebar click) go through here.
+const loadSpectrum = function(mz, it, csvName){
+ RAW_MZ = mz;
+ RAW_IT = it;
+ CSV_NAME = csvName || "";
+ G = (RAW_MZ.length >= 2) ? buildGrid() : null;
+ // Update the sibling-CSV hyperlink in the header to reflect the new name.
+ const a = document.getElementById('csvfile');
+ if (a) { a.textContent = CSV_NAME; a.href = CSV_NAME; a.download = CSV_NAME; }
+ // Recompute and redraw. recompute is the existing top-level entry
+ // the controls already call on input changes; it re-reads RAW_MZ/G.
+ if (typeof recompute === 'function' && G) recompute();
+};
 
 // ---------- smoothing primitives (zero-padded) ----------
 // The baseline outside a peak group is physically zero, so the smoothing
@@ -1136,7 +1151,7 @@ document.getElementById('savepreset').addEventListener('click',async()=>{
   presetStat.textContent='downloaded preset.json - move it next to build_lcr_viewer.py';
  }
 });
-recompute();
+loadSpectrum(__MZ__, __IT__, __CSVNAME__);
 
 // ---------- ladder labeler: panel binding ----------
 // Hooks the LadderLabeler module to the control panel inserted in Task 9

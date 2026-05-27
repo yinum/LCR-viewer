@@ -144,6 +144,23 @@ class TestBuildHtml(unittest.TestCase):
         self.assertIn("/csv?name=", html)        # serve-mode POST endpoint
         self.assertIn("siblingHandle", html)     # file:// FSA handle cache
 
+    def test_default_build_calls_loadSpectrum_at_startup(self):
+        """A default build's HTML must call loadSpectrum(mz, it, csvName)
+        once at startup so the uploader can reuse the same entry point."""
+        import re
+        mz = [100.0, 200.0, 300.0]
+        it = [10.0, 20.0, 30.0]
+        html = blv.build_html(
+            mz, it, 250.0, "/* plotly stub */",
+            "LCR_mz200_20260101-0000.html",
+            blv.PRESET,
+            "/* labeler stub */",
+        )
+        # loadSpectrum(...) must be called exactly once with the inlined arrays.
+        matches = re.findall(r"loadSpectrum\(", html)
+        self.assertEqual(len(matches), 1,
+                         "expected exactly one loadSpectrum(...) call in default build")
+
 
 class TestSavePostedCsv(unittest.TestCase):
     def setUp(self):
