@@ -161,6 +161,60 @@ class TestBuildHtml(unittest.TestCase):
         self.assertEqual(len(matches), 1,
                          "expected exactly one loadSpectrum(...) call in default build")
 
+    def test_hdb_keys_bound_at_loadSpectrum_call_time_not_script_init(self):
+        """HDB_SIBLING and HDB_LINK must be assigned inside loadSpectrum so they
+        reflect the per-spectrum CSV_NAME; capturing them at script-init time
+        (when CSV_NAME is still '') breaks IndexedDB handle persistence on reload.
+
+        Regression test for the bug introduced by 959f5bf: the refactor made
+        CSV_NAME mutable but left HDB_SIBLING/HDB_LINK as top-level const
+        expressions that evaluated before loadSpectrum was ever called."""
+        mz = [100.0, 200.0, 300.0]
+        it = [10.0, 20.0, 30.0]
+        html = blv.build_html(
+            mz, it, 500.0, "/* plotly stub */",
+            "LCR_mz500_test.html",
+            blv.PRESET,
+            "/* labeler stub */",
+        )
+        # --- Bug check: the top-level const form must NOT appear ---
+        # Before the fix, the template contained:
+        #   const HDB_SIBLING='sibling:'+CSV_NAME,HDB_LINK='link:'+CSV_NAME;
+        # which captured CSV_NAME="" at script-init time, not at call time.
+        self.assertNotIn(
+            "const HDB_SIBLING='sibling:'+CSV_NAME",
+            html,
+            "HDB_SIBLING must not be a top-level const capturing CSV_NAME at "
+            "script-init time; it must be assigned inside loadSpectrum instead",
+        )
+        self.assertNotIn(
+            "const HDB_LINK='link:'+CSV_NAME",
+            html,
+            "HDB_LINK must not be a top-level const capturing CSV_NAME at "
+            "script-init time; it must be assigned inside loadSpectrum instead",
+        )
+        # --- Fix check: mutable top-level declarations with empty initial value ---
+        self.assertIn(
+            "let HDB_SIBLING='',HDB_LINK='';",
+            html,
+            "HDB_SIBLING and HDB_LINK should be declared as mutable (let) "
+            "top-level vars initialized to '' so loadSpectrum can assign them",
+        )
+        # --- Fix check: assignments appear inside the loadSpectrum body ---
+        # The assignment must use the mutable-variable form (not const).
+        self.assertIn(
+            "HDB_SIBLING = 'sibling:' + CSV_NAME",
+            html,
+            "Expected HDB_SIBLING to be re-assigned inside loadSpectrum body "
+            "so the key reflects the current CSV_NAME at call time",
+        )
+        self.assertIn(
+            "HDB_LINK    = 'link:'    + CSV_NAME",
+            html,
+            "Expected HDB_LINK to be re-assigned inside loadSpectrum body "
+            "so the key reflects the current CSV_NAME at call time",
+        )
+
 
 class TestSavePostedCsv(unittest.TestCase):
     def setUp(self):

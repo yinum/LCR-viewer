@@ -793,6 +793,9 @@ const loadSpectrum = function(mz, it, csvName){
  RAW_MZ = mz;
  RAW_IT = it;
  CSV_NAME = csvName || "";
+ // Keep IndexedDB handle keys in sync with the active CSV name.
+ HDB_SIBLING = 'sibling:' + CSV_NAME;
+ HDB_LINK    = 'link:'    + CSV_NAME;
  G = (RAW_MZ.length >= 2) ? buildGrid() : null;
  // Update the sibling-CSV hyperlink in the header to reflect the new name.
  const a = document.getElementById('csvfile');
@@ -997,7 +1000,9 @@ let siblingHandle=null;
 const updateBtn=document.getElementById('updatecsv');
 const updateStat=document.getElementById('updatecsvstat');
 const HDB_NAME='lcr-viewer',HDB_STORE='handles';
-const HDB_SIBLING='sibling:'+CSV_NAME,HDB_LINK='link:'+CSV_NAME;
+// Late-bound: reassigned by loadSpectrum so they always reflect the current
+// CSV_NAME rather than the empty string present at script-init time.
+let HDB_SIBLING='',HDB_LINK='';
 function hdbOpen(){return new Promise((res,rej)=>{
  const r=indexedDB.open(HDB_NAME,1);
  r.onupgradeneeded=()=>r.result.createObjectStore(HDB_STORE);
