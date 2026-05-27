@@ -97,6 +97,14 @@ try {
               parseMessage:'oops' });
   check('store: parseStatus stored',
         store.all().find(s => s.name === 'a.xy').parseStatus === 'error');
+
+  // --- auto-activation rule ---
+  const s3 = LCRUploader.createStore();
+  s3.add({ name: 'bad.xy', mz:[], intensity:[], parseStatus:'error', parseMessage:'oops' });
+  check('store: error entry not auto-activated', s3.activeName() === null);
+  s3.add({ name: 'good.xy', mz:[1], intensity:[1] });
+  check('store: good entry after error becomes active',
+        s3.activeName() === 'good.xy');
 } catch (e) {
   check('exception during test run', false, e.message + '\n' + e.stack);
 }

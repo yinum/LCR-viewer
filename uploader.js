@@ -147,8 +147,13 @@
       await new Promise((res, rej) => entry.file(f => { files.push(f); res(); }, rej));
     } else if (entry.isDirectory) {
       const reader = entry.createReader();
-      const subs = await new Promise(res => reader.readEntries(res));
-      for (const sub of subs) await collectFilesFromEntry(sub, files);
+      // readEntries returns up to ~100 entries per call (Chrome's batch size).
+      // Loop until it yields an empty array so folders >100 files load fully.
+      let batch;
+      do {
+        batch = await new Promise(res => reader.readEntries(res));
+        for (const sub of batch) await collectFilesFromEntry(sub, files);
+      } while (batch.length > 0);
     }
   }
 
