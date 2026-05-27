@@ -72,6 +72,31 @@ try {
     LCRUploader.precursorFromName('3300_PF4_polyP.xy') === null);
   check('precursorFromName: no number', () =>
     LCRUploader.precursorFromName('polyP_no_number.xy') === null);
+
+  // --- spectra store ---
+  const store = LCRUploader.createStore();
+
+  check('store: starts empty', store.all().length === 0);
+
+  store.add({ name: 'a.xy', mz: [1,2,3], intensity: [1,2,3] });
+  store.add({ name: 'b.xy', mz: [4,5], intensity: [4,5] });
+  check('store: add two', store.all().length === 2);
+
+  check('store: first auto-active', store.activeName() === 'a.xy');
+
+  store.setActive('b.xy');
+  check('store: setActive switches', store.activeName() === 'b.xy');
+  check('store: active() returns chosen entry',
+        store.active().mz[0] === 4);
+
+  store.remove('a.xy');
+  check('store: remove drops entry', store.all().length === 1 &&
+                                     store.all()[0].name === 'b.xy');
+
+  store.add({ name: 'a.xy', mz:[1], intensity:[1], parseStatus:'error',
+              parseMessage:'oops' });
+  check('store: parseStatus stored',
+        store.all().find(s => s.name === 'a.xy').parseStatus === 'error');
 } catch (e) {
   check('exception during test run', false, e.message + '\n' + e.stack);
 }
