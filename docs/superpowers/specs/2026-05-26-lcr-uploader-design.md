@@ -331,15 +331,18 @@ no permissions change is needed.
 - Filename precursor extraction
 - Multi-spectrum sidebar (switch, remove, add-more)
 - Per-spectrum ladder labels + AUC
-- Global smoothing/scaling with "apply to this / all" toggle
 - "Try with example spectrum"
 - Download CSV (active), PNG, all-CSVs-as-zip
 - Catch-all "copy & ask AI" error panel with build stamp
 - GitHub Release asset + GitHub Pages auto-deploy
-- Plain-language labels, hover tips, "Advanced" disclosure
 - Responsive layout
 
 ### Deferred to v2
+- "Apply to: this / all spectra" toggle (smoothing/scaling are global in v1
+  — the `perSpectrumOverrides` store field is reserved for this)
+- "Advanced" disclosure widget around ladder vocabulary + hover tips on
+  every control (v1 ships the inline `(opt-in; off by default)` note for
+  ladders only)
 - IndexedDB session persistence
 - Per-spectrum independent smoothing as default
 - Cross-spectrum overlays
