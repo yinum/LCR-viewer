@@ -95,8 +95,8 @@ class TestBuildHtml(unittest.TestCase):
 
     def test_preset_values_baked_in(self):
         html = blv.build_html(self.MZ, self.IT, 123.45, "/*plotly*/", self.NAME, blv.PRESET, "")
-        self.assertIn('id="scale" value="10"', html)
-        self.assertIn('id="width" value="0.04"', html)
+        self.assertIn('id="scale" value="4"', html)
+        self.assertIn('id="width" value="4"', html)
         self.assertIn('id="thr" value="123.45"', html)
         self.assertIn('value="avg" selected', html)
         # overlay preset is False -> rawov checkbox must NOT be checked

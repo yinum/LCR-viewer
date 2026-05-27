@@ -324,6 +324,21 @@
 
     const dlAll = document.getElementById('dl-all-zip');
     if (dlAll) dlAll.addEventListener('click', buildAllCsvsZip);
+
+    const collapseBtn = document.getElementById('uploader-collapse');
+    const expandBtn = document.getElementById('uploader-expand');
+    if (collapseBtn) collapseBtn.addEventListener('click', () => {
+      document.body.classList.add('sidebar-collapsed');
+      if (typeof Plotly !== 'undefined' && Plotly.Plots && Plotly.Plots.resize) {
+        Plotly.Plots.resize('plot');
+      }
+    });
+    if (expandBtn) expandBtn.addEventListener('click', () => {
+      document.body.classList.remove('sidebar-collapsed');
+      if (typeof Plotly !== 'undefined' && Plotly.Plots && Plotly.Plots.resize) {
+        Plotly.Plots.resize('plot');
+      }
+    });
   }
 
   // Run after DOMContentLoaded so the static HTML is parsed.

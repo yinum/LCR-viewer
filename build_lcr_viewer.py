@@ -39,9 +39,9 @@ PRESET = {
     "scale_on": True,       # apply the charge-reduced x factor at all; turn off
                             # for plain MS1 smoothing (everything stays x1, and
                             # the threshold line/annotation are hidden)
-    "scale": 10,            # charge-reduced x factor (used only when scale_on)
+    "scale": 4,             # charge-reduced x factor (used only when scale_on)
     "method": "avg",        # smoothing method (adjacent averaging)
-    "width_mz": 0.04,       # smoothing width in m/z
+    "width_mz": 4,          # smoothing width in m/z
     "poly": 3,              # SG poly order, retained for the SG control
     "show_overlay": False,  # pre-smoothing overlay checkbox default
     # Ladder-labeling block — opt-in module documented in
@@ -729,6 +729,9 @@ TEMPLATE = r"""<!DOCTYPE html>
  .hint{font-size:11px;color:#888;padding:5px 14px;line-height:1.5}
  #status{color:#0050b3;font-weight:600}
  #csvfile{font-size:11px;color:#0050b3;word-break:break-all;max-width:240px}
+ /* Uploader sidebar toggle buttons — base-hidden; uploader-style turns them on. */
+ #uploader-collapse{display:none}
+ #uploader-expand{display:none}
 </style>
 <meta name="lcr-build" content="__UPLOADER_BUILD__">
 <script>window.__LCR_BUILD__="__UPLOADER_BUILD__";</script>
@@ -761,11 +764,22 @@ TEMPLATE = r"""<!DOCTYPE html>
     (two columns: m/z and intensity)</p>
 </div>
 
+<button id="uploader-expand" title="Show spectra list" style="
+        position:fixed;left:4px;top:4px;z-index:6;width:30px;height:30px;
+        padding:0;border:1px solid #ccc;background:#fff;cursor:pointer;
+        font-size:18px;line-height:1;border-radius:3px">&#9776;</button>
 <div id="uploader-sidebar" hidden style="
      position:fixed;left:0;top:0;bottom:0;width:220px;background:#f4f4f4;
      border-right:1px solid #ddd;overflow:auto;padding:10px;font-size:12px;
      z-index:5">
-  <div style="font-weight:600;margin-bottom:6px">Loaded spectra</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;
+              margin-bottom:6px">
+    <span style="font-weight:600">Loaded spectra</span>
+    <button id="uploader-collapse" title="Hide spectra list"
+            style="border:1px solid #ccc;background:#fff;cursor:pointer;
+                   width:22px;height:22px;padding:0;line-height:1;
+                   font-size:14px;border-radius:3px">&#8249;</button>
+  </div>
   <ul id="uploader-list" style="list-style:none;padding:0;margin:0"></ul>
   <button id="uploader-add-more"
           style="margin-top:8px;width:100%;font-size:12px">+ Add more</button>
@@ -843,11 +857,21 @@ TEMPLATE = r"""<!DOCTYPE html>
 <!-- Uploader-only: hide single-spectrum FSA buttons when in uploader build. -->
 <style id="uploader-style" disabled>
  #updatecsv, #link, #savepreset { display:none !important; }
- #controls, #plot, .hint { margin-left: 220px; }
+ /* Sidebar is open: push and constrain content to viewport - sidebar. */
+ #controls, #plot, .hint { margin-left: 220px;
+                           max-width: calc(100% - 220px); box-sizing: border-box; }
+ /* Sidebar visible in uploader mode → collapse button is reachable. */
+ #uploader-collapse { display: inline-block; }
+ /* Sidebar collapsed: hide sidebar, reclaim full width, show expand chevron. */
+ body.sidebar-collapsed #uploader-sidebar { display: none !important; }
+ body.sidebar-collapsed #uploader-expand { display: block; }
+ body.sidebar-collapsed #controls,
+ body.sidebar-collapsed #plot,
+ body.sidebar-collapsed .hint { margin-left: 0; max-width: 100%; }
  @media (max-width: 768px) {
    #uploader-sidebar { position:static;width:100%;height:auto;border-right:none;
                        border-bottom:1px solid #ddd }
-   #controls, #plot, .hint { margin-left: 0; }
+   #controls, #plot, .hint { margin-left: 0; max-width: 100%; }
  }
 </style>
 <div class="hint">
