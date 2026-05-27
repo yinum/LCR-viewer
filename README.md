@@ -6,7 +6,7 @@ one run.
 
 The viewer lets you:
 
-1. **Scale** the charge-reduced region (`m/z >= threshold`) by a factor (preset 10x),
+1. **Scale** the charge-reduced region (`m/z >= threshold`) by a factor (preset 4x),
    leaving the parent envelope at 1x. Optional — turn it off with the
    **"Scale charge-reduced region"** checkbox to smooth a plain MS1 spectrum
    with no scaling.
@@ -86,7 +86,7 @@ intense than the precursor. The timestamp means re-runs never overwrite a
 prior viewer.
 
 Processing parameters come from the preset (built-in `PRESET` defaults —
-charge-reduced scaling on (×10), adjacent-averaging smoothing, width 0.04 m/z,
+charge-reduced scaling on (×4), adjacent-averaging smoothing, width 4 m/z,
 pre-smoothing overlay hidden — overlaid by a viewer-saved `preset.json` if
 present; see [Saving a preset](#saving-a-preset)). The "scale applies above
 m/z" threshold is auto-placed per spectrum, just past the parent envelope.

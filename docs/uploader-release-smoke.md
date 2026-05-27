@@ -23,6 +23,14 @@ For Safari, Firefox, Chrome, Edge:
 - [ ] Click a different row → plot switches
 - [ ] Click ✕ → row removed, plot moves to remaining spectrum
 
+## Sidebar toggle (v0.1.1)
+
+- [ ] With ≥1 spectrum loaded, click `‹` in the sidebar header → sidebar
+      hides; plot re-flows to full viewport width; `≡` button appears
+      top-left
+- [ ] Click `≡` → sidebar comes back; plot re-flows to `viewport − 220px`
+      with no horizontal overflow
+
 ## Ladder persistence
 
 - [ ] Enable Ladder labels; add a ladder on spectrum A
