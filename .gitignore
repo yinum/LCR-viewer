@@ -1,5 +1,6 @@
-# Vendored plotting library — re-download, see README
+# Vendored libraries — re-download, see README
 plotly-basic.min.js
+jszip.min.js
 
 # Input spectra and generated viewers (data / outputs — never commit)
 *.txt

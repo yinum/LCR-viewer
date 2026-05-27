@@ -264,11 +264,13 @@
     if (!a) {
       showEmptyState(true);
       renderSidebar(store);
+      refreshBulkBtn();
       _previousActiveName = null;
       return;
     }
     showEmptyState(false);
     renderSidebar(store);
+    refreshBulkBtn();
     // Restore incoming ladders BEFORE loadSpectrum triggers recompute,
     // so refreshAll / Plotly.react draw the correct annotations on the first pass.
     if (typeof LadderLabeler !== 'undefined' && LadderLabeler.loadState) {
@@ -319,6 +321,9 @@
       pickerMore && pickerMore.click());
     if (example) example.addEventListener('click', () =>
       loadExampleSpectrum(store, onStoreChange));
+
+    const dlAll = document.getElementById('dl-all-zip');
+    if (dlAll) dlAll.addEventListener('click', buildAllCsvsZip);
   }
 
   // Run after DOMContentLoaded so the static HTML is parsed.
@@ -345,6 +350,35 @@
       `Error: ${err && err.message || String(err)}\n` +
       `Stack: ${stack}`;
     panel.hidden = false;
+  }
+
+  async function buildAllCsvsZip() {
+    if (typeof JSZip === 'undefined') throw new Error('JSZip not loaded');
+    if (!store) return;
+    const zip = new JSZip();
+    for (const e of store.all()) {
+      if (e.parseStatus !== 'ok') continue;
+      const csv = (typeof buildProcessedCsvForSpectrum === 'function')
+        ? buildProcessedCsvForSpectrum(e.mz, e.intensity)
+        : '';
+      const name = e.name.replace(/\.[^.]+$/, '') + '_processed.csv';
+      zip.file(name, csv);
+    }
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'LCR_processed_csvs.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function refreshBulkBtn() {
+    const btn = document.getElementById('dl-all-zip');
+    if (!btn) return;
+    const ok = store ? store.all().filter(e => e.parseStatus === 'ok').length : 0;
+    btn.hidden = ok < 2;
   }
 
   function initErrorPanel() {
@@ -390,4 +424,6 @@
   root.LCRUploader.renderSidebar = renderSidebar;  // exposed for tests
   root.LCRUploader.initUploader = initUploader;
   root.LCRUploader.showErrorPanel = showErrorPanel;
+  root.LCRUploader.buildAllCsvsZip = buildAllCsvsZip;
+  root.LCRUploader.refreshBulkBtn = refreshBulkBtn;
 })(typeof window !== 'undefined' ? window : global);

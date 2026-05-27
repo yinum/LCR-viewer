@@ -25,11 +25,13 @@ Each build also writes a processed CSV next to the viewer (see
 
 ## Setup
 
-The Plotly basic bundle is not committed (third-party, ~1 MB). Download it once
-next to the script:
+The Plotly basic bundle and JSZip are not committed (third-party; Plotly ~1 MB,
+JSZip ~94 KB used by the uploader's Download-all-CSVs button). Download them
+once next to the script:
 
 ```sh
 curl -sL https://cdn.plot.ly/plotly-basic-2.35.2.min.js -o plotly-basic.min.js
+curl -sL https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js -o jszip.min.js
 ```
 
 ## Usage

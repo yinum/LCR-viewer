@@ -799,6 +799,9 @@ TEMPLATE = r"""<!DOCTYPE html>
    <label><input type="checkbox" id="rawov" __RAWOV__> pre-smoothing overlay</label>
    <label><input type="checkbox" id="logy"> log Y axis</label></div>
  <div class="ctl"><button id="dl">Download processed CSV</button></div>
+ <div class="ctl uploader-hide-when-empty">
+  <button id="dl-all-zip" hidden>Download all CSVs (zip)</button>
+ </div>
  <div class="ctl"><button id="updatecsv">Update sibling CSV</button>
    <span id="updatecsvstat" style="font-size:11px;color:#888;margin-top:3px"></span></div>
  <div class="ctl"><button id="link">Link CSV file (live)</button>
@@ -1111,6 +1114,38 @@ function buildCSV(){
  let csv='m/z,intensity_processed\n';
  for(let i=0;i<PROC_X.length;i++)
   if(PROC_Y[i]>0)csv+=PROC_X[i]+','+PROC_Y[i]+'\n';
+ return csv;
+}
+// computeProcessed: run the scale+smooth pipeline on the current G/controls,
+// returning {x, y} without touching PROC_X/PROC_Y or the visible plot.
+// Used by buildProcessedCsvForSpectrum() below.
+function computeProcessed(){
+ if(!G)return{x:[],y:[]};
+ const scaleOn=document.getElementById('scaleon').checked;
+ const factor=scaleOn?(parseFloat(document.getElementById('scale').value)||1):1;
+ const thr=parseFloat(document.getElementById('thr').value)||0;
+ const method=document.getElementById('method').value;
+ const widthMz=parseFloat(document.getElementById('width').value)||0.04;
+ const p=parseInt(document.getElementById('poly').value)||3;
+ const scaled=scaleOn?G.git.map((v,i)=>G.gmz[i]>=thr?v*factor:v):G.git.slice();
+ const sm=smoothAll(scaled,method,widthMz,p);
+ return{x:G.gmz,y:sm};
+}
+// buildProcessedCsvForSpectrum: build CSV for any (mz, it) pair using the
+// current control values — without disturbing the visible plot or PROC_X/PROC_Y.
+function buildProcessedCsvForSpectrum(mz,it){
+ const savedMz=RAW_MZ,savedIt=RAW_IT,savedG=G;
+ RAW_MZ=mz; RAW_IT=it; G=buildGrid();
+ let csv='';
+ try{
+  const proc=computeProcessed();
+  let lines='m/z,intensity_processed\n';
+  for(let i=0;i<proc.x.length;i++)
+   if(proc.y[i]>0)lines+=proc.x[i]+','+proc.y[i]+'\n';
+  csv=lines;
+ }finally{
+  RAW_MZ=savedMz; RAW_IT=savedIt; G=savedG;
+ }
  return csv;
 }
 document.getElementById('dl').addEventListener('click',async()=>{

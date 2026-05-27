@@ -133,6 +133,14 @@ try {
   } else {
     // Labeler not loaded in this test environment — skip.
   }
+  // --- bulk zip: export presence ---
+  // Module-level `store` is private so refreshBulkBtn visibility cannot be
+  // asserted without DOM wiring; that is covered by the manual smoke test
+  // (Task 11). Here we just verify the exports exist.
+  check('buildAllCsvsZip exported',
+        typeof LCRUploader.buildAllCsvsZip === 'function');
+  check('refreshBulkBtn exported',
+        typeof LCRUploader.refreshBulkBtn === 'function');
   // --- error panel (DOM stubs in Node) ---
   if (typeof document !== 'undefined') {
     // Provide the panel + body elements the function looks for via getElementById.
