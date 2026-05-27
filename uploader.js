@@ -354,10 +354,12 @@
     function openPaste() {
       if (!pasteModal) return;
       pasteText.value = ''; pasteName.value = ''; pasteErr.textContent = '';
-      pasteModal.hidden = false;
+      pasteModal.style.display = 'flex';
       setTimeout(() => pasteText.focus(), 0);
     }
-    function closePaste() { if (pasteModal) pasteModal.hidden = true; }
+    function closePaste() {
+      if (pasteModal) pasteModal.style.display = 'none';
+    }
     if (pasteOpenA) pasteOpenA.addEventListener('click', openPaste);
     if (pasteOpenB) pasteOpenB.addEventListener('click', openPaste);
     if (pasteCancel) pasteCancel.addEventListener('click', closePaste);

@@ -796,10 +796,12 @@ TEMPLATE = r"""<!DOCTYPE html>
 <div id="uploader-pane-offset" hidden
      style="position:absolute;left:220px;right:0;top:0"></div>
 
-<!-- Paste-data modal: hidden until uploader.js opens it. -->
-<div id="uploader-paste-modal" hidden style="
+<!-- Paste-data modal: display:none until uploader.js opens it. Using
+     style.display (not the [hidden] attribute) because the inline
+     display:flex below would otherwise override [hidden]. -->
+<div id="uploader-paste-modal" style="
      position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10;
-     display:flex;align-items:center;justify-content:center">
+     display:none;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:6px;padding:18px 20px;
               max-width:560px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
     <div style="font-weight:600;font-size:15px;margin-bottom:6px">
