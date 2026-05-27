@@ -534,7 +534,12 @@ const LadderLabeler = (function () {
   // Returns a plain-object snapshot (JSON-safe). Sets are converted to arrays.
   function serializeState() {
     return {
+      // Deep-clone seed (object) and labels (array of flat records with only
+      // primitive fields — one Object.assign level suffices). excludedZ is a
+      // Set, converted to an array for JSON-safety.
       ladders: state.ladders.map(L => Object.assign({}, L, {
+        seed: Object.assign({}, L.seed),
+        labels: L.labels.map(lb => Object.assign({}, lb)),
         excludedZ: Array.from(L.excludedZ),
       })),
       activeLadderId: state.activeLadderId,
@@ -543,8 +548,15 @@ const LadderLabeler = (function () {
 
   // Restore per-spectrum ladder state from a snapshot produced by serializeState.
   // Accepts the empty-array shorthand [] used by uploader.js when no state was
-  // ever saved for a spectrum. After loading, callers should trigger a re-render.
+  // ever saved for a spectrum. Accepts undefined/null defensively (clears state).
+  // After loading, callers should trigger a re-render.
   function loadState(serialized) {
+    if (!serialized) {
+      // null / undefined / falsy: clear state rather than throw.
+      state.ladders = [];
+      state.activeLadderId = null;
+      return;
+    }
     if (Array.isArray(serialized)) {
       // Shorthand: no ladders saved yet for this spectrum.
       state.ladders = [];

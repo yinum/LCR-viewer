@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <title>uploader.js tests</title>
+<script src="../ladder_labeler.js"></script>
 <script src="../uploader.js"></script>
 <script>
 const summary = document.createElement('div'); summary.id = 'summary';
@@ -117,6 +118,21 @@ try {
   s2.setActive('a.xy');
   check('store: ladders preserved on A→B→A switch',
         s2.active().ladders[0].id === 'lA');
+
+  // --- loadState defensive cases ---
+  if (typeof LadderLabeler !== 'undefined' && LadderLabeler.loadState) {
+    // loadState(undefined) is a no-throw no-op-like that clears state.
+    let threw = false;
+    try { LadderLabeler.loadState(undefined); } catch (e) { threw = true; }
+    check('LadderLabeler.loadState(undefined) does not throw', !threw);
+
+    // loadState([]) clears ladders.
+    LadderLabeler.loadState([]);
+    check('LadderLabeler.loadState([]) yields empty ladders',
+          LadderLabeler.state.ladders.length === 0);
+  } else {
+    // Labeler not loaded in this test environment — skip.
+  }
 } catch (e) {
   check('exception during test run', false, e.message + '\n' + e.stack);
 }

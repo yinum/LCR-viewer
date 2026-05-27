@@ -269,14 +269,15 @@
     }
     showEmptyState(false);
     renderSidebar(store);
+    // Restore incoming ladders BEFORE loadSpectrum triggers recompute,
+    // so refreshAll / Plotly.react draw the correct annotations on the first pass.
+    if (typeof LadderLabeler !== 'undefined' && LadderLabeler.loadState) {
+      LadderLabeler.loadState(a.ladders || []);
+    }
     // Hand the active spectrum to the existing viewer entry point.
     const csvName = a.name.replace(/\.[^.]+$/, '') + '.csv';
     if (typeof loadSpectrum === 'function') {
       loadSpectrum(a.mz, a.intensity, csvName);
-    }
-    // Restore incoming ladders.
-    if (typeof LadderLabeler !== 'undefined' && LadderLabeler.loadState) {
-      LadderLabeler.loadState(a.ladders || []);
     }
     _previousActiveName = a.name;
   }
