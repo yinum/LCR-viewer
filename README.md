@@ -1,8 +1,8 @@
 # LCR spectrum viewer
 
 Builds self-contained interactive HTML viewers for limited-charge-reduction
-(LCR) mass spectra (Waters Synapt, positive mode) — one viewer per spectrum, or a
-whole folder of spectra in one run.
+(LCR) mass spectra — one viewer per spectrum, or a whole folder of spectra in
+one run.
 
 The viewer lets you:
 
@@ -66,9 +66,9 @@ python3 build_lcr_viewer.py [--serve] INPUT [OUTPUT_DIR]
   per `.txt`/`.csv`/`.xy` file inside it.
 - `OUTPUT_DIR` — optional; defaults to `output/LCR/<dataset>/` beside the
   script, where `<dataset>` is the input folder's name (the parent folder's
-  name for a single input file). Point the build at `results/LCR/PF4_polyP/`
-  and its viewers land in `output/LCR/PF4_polyP/`; `results/LCR/polyP/` →
-  `output/LCR/polyP/`. The whole `output/` tree is git-ignored.
+  name for a single input file). Point the build at
+  `data/LCR/example_dataset/` and its viewers land in
+  `output/LCR/example_dataset/`. The whole `output/` tree is git-ignored.
 - `--serve` — after building, also serve the viewer(s) on a localhost address
   and open the browser, so **Save preset** writes `preset.json` directly and
   **Update sibling CSV** overwrites the build-time sibling without a dialog
@@ -79,7 +79,7 @@ Each run writes two files per spectrum into `OUTPUT_DIR`: the viewer
 `LCR_mz<precursor>_<YYYYMMDD-HHMM>.html` and a sibling processed CSV with the
 same stem (see [Sibling CSV file](#sibling-csv-file)). The precursor
 m/z is read from the spectrum filename's trailing number when present
-(`PF4_polyP_3300.xy` → `3300`, decimals allowed); otherwise it is inferred
+(`example_3300.xy` → `3300`, decimals allowed); otherwise it is inferred
 from the base peak. A filename precursor also anchors the scaling threshold to
 that m/z's peak cluster — correct even when a charge-reduced product is more
 intense than the precursor. The timestamp means re-runs never overwrite a
@@ -228,7 +228,7 @@ them per spectrum.
 
 - The labeler is a v1 prototype: manual input uses browser `prompt()`
   dialogs, which work but are visually plain.
-- Designed for **native MS positive mode** (Synapt G2 QTOF) — formula:
+- Designed for **native MS positive mode** — formula:
   `M = z·(m/z) − z·m_H`. Negative mode is not supported in v1.
 - Per-rung implied-`M` cross-check is visible only in the hover tooltip
   on each labeled peak. The header `M` is computed from the seed alone.
